@@ -34,7 +34,7 @@ jobs:
             type=sha
           flavor: |
             latest=auto
-            prefix=dotnet-22.04
+            prefix=dotnet-22.04-
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v2
