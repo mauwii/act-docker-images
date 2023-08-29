@@ -13,6 +13,11 @@ RUN curl -sL https://aka.ms/InstallAzureCLIDeb | bash \
     && az bicep install --target-platform "linux-$(if [[ $(dpkg --print-architecture) == "amd64" ]]; then echo x64; else dpkg --print-architecture; fi)" \
     && rm -rf /var/lib/apt/lists/*
 
+# install bicep-cli
+RUN curl -Lo bicep https://github.com/Azure/bicep/releases/latest/download/bicep-"linux-$(if [[ $(dpkg --print-architecture) == "amd64" ]]; then echo x64; else dpkg --print-architecture; fi)" \
+    && chmod +x ./bicep \
+    && mv ./bicep /usr/local/bin/bicep
+
 # Install Github CLI
 # hadolint ignore=DL3008
 RUN curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg \
