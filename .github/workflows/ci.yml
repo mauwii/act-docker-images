@@ -36,7 +36,7 @@ jobs:
             type=sha
           flavor: |
             latest=auto
-            prefix=dotnet-22.04-
+            prefix=act-22.04-
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v2
@@ -68,5 +68,5 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
-          sbom: true
+          provenance: false
           github-token: ${{ secrets.GITHUB_TOKEN }}
