@@ -1,12 +1,16 @@
 # syntax=docker/dockerfile:1
-FROM catthehacker/ubuntu:dotnet-22.04
+FROM catthehacker/ubuntu:act-22.04
 
+ARG TARGETARCH
 SHELL ["/bin/bash", "--login", "-e", "-o", "pipefail", "-c"]
+
+# install dotnet
+RUN /imagegeneration/installers/dotnet.sh
 
 # Install Azure CLI
 RUN curl -sL https://aka.ms/InstallAzureCLIDeb | bash \
     && az extension add -n azure-devops \
-    && az bicep install \
+    && az bicep install --target-platform "linux-$(dpkg --print-architecture)" \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Github CLI
