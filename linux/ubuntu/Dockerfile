@@ -10,7 +10,7 @@ RUN /imagegeneration/installers/dotnet.sh
 # Install Azure CLI
 RUN curl -sL https://aka.ms/InstallAzureCLIDeb | bash \
     && az extension add -n azure-devops \
-    && az bicep install --target-platform "linux-$(dpkg --print-architecture)" \
+    && az bicep install --target-platform "linux-$(if [[ $(dpkg --print-architecture) == "amd64" ]]; then echo x64; else dpkg --print-architecture; fi)" \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Github CLI
