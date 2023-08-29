@@ -30,13 +30,14 @@ jobs:
             ${{ github.repository_owner }}/ubuntu
             ghcr.io/${{ github.repository_owner }}/ubuntu
           tags: |
+            type=raw,value=latest,enable={{is_default_branch}}
             type=schedule
             type=ref,event=branch
             type=ref,event=pr
             type=sha
           flavor: |
             latest=auto
-            prefix=act-22.04-
+            prefix=act-22.04-,onlatest=true
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v2
