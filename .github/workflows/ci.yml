@@ -5,9 +5,11 @@ on:
     branches: [main, develop]
     paths:
       - '**/Dockerfile'
+      - '.github/ci.yml'
   pull_request:
     paths:
       - '**/Dockerfile'
+      - '.github/ci.yml'
 
 permissions:
   contents: read
