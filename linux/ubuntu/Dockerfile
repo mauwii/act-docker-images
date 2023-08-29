@@ -1,11 +1,14 @@
 # syntax=docker/dockerfile:1
-FROM catthehacker/ubuntu:act-22.04
+ARG FROM_TAG=act-22.04
+ARG FROM_IMAGE=catthehacker/ubuntu
+FROM ${FROM_IMAGE}:${FROM_TAG}
 
 ARG TARGETARCH
 SHELL ["/bin/bash", "--login", "-e", "-o", "pipefail", "-c"]
 
 # install dotnet
 RUN /imagegeneration/installers/dotnet.sh
+ENV PATH="${PATH}:/opt/hostedtoolcache/dotnet"
 
 # Install Azure CLI
 RUN curl -sL https://aka.ms/InstallAzureCLIDeb | bash \
