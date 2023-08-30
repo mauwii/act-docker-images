@@ -5,7 +5,6 @@ on:
     branches: [main, develop]
     paths:
       - '**/Dockerfile'
-      - '**/.github/workflows/ci.yml'
   pull_request:
     paths:
       - '**/Dockerfile'
@@ -17,27 +16,19 @@ permissions:
   packages: write
 
 env:
-  REGISTRY_IMAGE: ${{ github.actor }}/ubuntu
+  IMAGE_NAME: ${{ github.repository_owner }}/ubuntu-act
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    if: github.triggering_actor != 'github-actions[bot]'
     strategy:
-      fail-fast: true
       matrix:
         platform: [linux/amd64, linux/arm64]
         from-tag: [act-22.04, act-20.04]
     steps:
       - name: Checkout
         uses: actions/checkout@v3
-
-      - name: Docker meta
-        id: meta
-        uses: docker/metadata-action@v4
-        with:
-          images: |
-            ${{ env.REGISTRY_IMAGE }}
-            ghcr.io/${{ env.REGISTRY_IMAGE }}
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v2
@@ -58,6 +49,14 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
+      - name: Create metadata for Docker Buildx
+        id: meta
+        uses: docker/metadata-action@v4
+        with:
+          images: |
+            ${{ env.IMAGE_NAME }}
+            ghcr.io/${{ env.IMAGE_NAME }}
+
       - name: Build and push by digest
         id: build
         uses: docker/build-push-action@v4
@@ -65,16 +64,16 @@ jobs:
           context: .
           file: ./linux/ubuntu/Dockerfile
           platforms: ${{ matrix.platform}}
-          # push: ${{ github.event_name != 'pull_request' }}
-          # tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           build-args: |
             FROM_TAG=${{ matrix.from-tag }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: |
+            type=gha
+            type=gha,key=${{ matrix.platform }}-${{ matrix.from-tag }}
+          cache-to: type=gha,mode=min,key=${{ matrix.platform }}-${{ matrix.from-tag }}
           provenance: false
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          outputs: type=image,name=${{ env.REGISTRY_IMAGE }},push-by-digest=true,name-canonical=true,push=${{ github.event_name != 'pull_request' }}
+          outputs: type=image,name=${{ env.IMAGE_NAME }},push-by-digest=true,name-canonical=true,push=${{ github.event_name != 'pull_request' }}
 
       - name: Export digest
         run: |
@@ -90,31 +89,18 @@ jobs:
           if-no-files-found: error
           retention-days: 1
 
-  merge-pr:
-    runs-on: ubuntu-latest
-    needs:
-      - build
-    if: github.actor == 'mauwii' && github.event_name == 'pull_request' &&  needs.build.result == 'success'
-    steps:
-      - name: Approve PR
-        run: gh pr review --approve "$PR_URL"
-        env:
-          PR_URL: ${{github.event.pull_request.html_url}}
-          GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
-      - name: Automerge PR
-        run: gh pr merge --auto --${{ github.base_ref == 'develop' && 'squash' || 'merge' }} "$PR_URL"
-        env:
-          PR_URL: ${{github.event.pull_request.html_url}}
-          GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
-
   manifests:
     runs-on: ubuntu-latest
     needs:
       - build
     strategy:
-      fail-fast: true
       matrix:
         from-tag: [act-22.04, act-20.04]
+        include:
+          - from-tag: act-22.04
+            image-tag: '22.04'
+          - from-tag: act-20.04
+            image-tag: '20.04'
     if: github.event_name != 'pull_request'
     steps:
       - name: Download digests
@@ -125,24 +111,6 @@ jobs:
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
-
-      - name: Docker meta
-        id: meta
-        uses: docker/metadata-action@v4
-        with:
-          images: |
-            ${{ env.REGISTRY_IMAGE }}
-            ghcr.io/${{ env.REGISTRY_IMAGE }}
-          tags: |
-            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' && matrix.from-tag == '22.04' }}
-            type=schedule
-            type=ref,event=branch
-            type=ref,event=pr
-            type=sha
-          flavor: |
-            latest=auto
-            prefix=${{ matrix.from-tag }}-,onlatest=true
-          github-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Login to GitHub Container Registry
         uses: docker/login-action@v2
@@ -157,12 +125,45 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
+      - name: Create tags for docker buildx
+        id: meta
+        uses: docker/metadata-action@v4
+        with:
+          images: |
+            ${{ env.IMAGE_NAME }}
+            ghcr.io/${{ env.IMAGE_NAME }}
+          tags: |
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' && matrix.from-tag == 'act-22.04' }}
+            type=raw,value=${{ matrix.image-tag }}
+            type=schedule
+            type=ref,event=branch
+            type=ref,event=pr
+            type=sha,prefix=${{ matrix.image-tag }}-
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Create manifest list and push
         working-directory: /tmp/digests/${{ matrix.from-tag }}
         run: |
           docker buildx imagetools create $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
-            $(printf '${{ env.REGISTRY_IMAGE }}@sha256:%s ' *)
+            $(printf '${{ env.IMAGE_NAME }}@sha256:%s ' *)
 
       - name: Inspect image
         run: |
-          docker buildx imagetools inspect ${{ env.REGISTRY_IMAGE }}:${{ steps.meta.outputs.version }}
+          docker buildx imagetools inspect ${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.version }}
+
+  merge-pr:
+    name: Merge Pull Request
+    runs-on: ubuntu-latest
+    needs: [build]
+    if: github.triggering_actor == 'mauwii' && github.event_name == 'pull_request' &&  needs.build.result == 'success'
+    steps:
+      - name: Approve PR
+        run: gh pr review --approve "$PR_URL"
+        env:
+          PR_URL: ${{github.event.pull_request.html_url}}
+          GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
+      - name: ${{ github.base_ref == 'develop' && 'squash merge' || 'merge' }} PR
+        run: gh pr merge --auto --${{ github.base_ref == 'develop' && 'squash' || 'merge' }} "$PR_URL"
+        env:
+          PR_URL: ${{github.event.pull_request.html_url}}
+          GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
