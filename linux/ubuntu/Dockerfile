@@ -8,7 +8,8 @@ SHELL ["/bin/bash", "--login", "-e", "-o", "pipefail", "-c"]
 
 # install dotnet
 RUN /imagegeneration/installers/dotnet.sh
-ENV PATH="${PATH}:/opt/hostedtoolcache/dotnet"
+ENV DOTNET_ROOT=/opt/hostedtoolcache/dotnet
+ENV PATH="${PATH}:$DOTNET_ROOT"
 
 # Install Azure CLI
 RUN curl -sL https://aka.ms/InstallAzureCLIDeb | bash \
