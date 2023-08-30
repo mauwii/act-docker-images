@@ -89,6 +89,15 @@ jobs:
           if-no-files-found: error
           retention-days: 1
 
+  # branch protection will require this job to pass
+  approve:
+    runs-on: ubuntu-latest
+    needs:
+      - build
+    if: github.event_name == 'pull_request' &&  success()
+    steps:
+      - run: echo "build succeeded"
+
   merge:
     runs-on: ubuntu-latest
     needs:
