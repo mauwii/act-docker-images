@@ -10,13 +10,14 @@ on:
       - '**/.github/workflows/ci.yml'
 
 permissions:
-  contents: write
+  contents: read
   pull-requests: write
   packages: write
   actions: write
 
 env:
   IMAGE_NAME: ${{ github.repository_owner }}/ubuntu-act
+  github-token: ${{ secrets.GITHUB_TOKEN }}
 
 jobs:
   build:
@@ -26,6 +27,11 @@ jobs:
       matrix:
         platform: [linux/amd64, linux/arm64]
         from-tag: [act-22.04, act-20.04]
+        include:
+          - from-tag: act-22.04
+            image-tag: '22.04'
+          - from-tag: act-20.04
+            image-tag: '20.04'
     steps:
       - name: Checkout
         uses: actions/checkout@v3
@@ -75,15 +81,15 @@ jobs:
 
       - name: Export digest
         run: |
-          mkdir -p /tmp/digests/${{ matrix.from-tag }}
+          mkdir -p /tmp/digests/${{ matrix.image-tag }}
           digest="${{ steps.build.outputs.digest }}"
-          touch "/tmp/digests/${{ matrix.from-tag }}/${digest#sha256:}"
+          touch "/tmp/digests/${{ matrix.image-tag }}/${digest#sha256:}"
 
       - name: Upload digest
         uses: actions/upload-artifact@v3
         with:
           name: digests
-          path: /tmp/digests/${{ matrix.from-tag }}/*
+          path: /tmp/digests/${{ matrix.image-tag }}/*
           if-no-files-found: error
           retention-days: 1
 
@@ -134,13 +140,13 @@ jobs:
             type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' && matrix.from-tag == 'act-22.04' }}
             type=raw,value=${{ matrix.image-tag }}
             type=schedule
-            type=ref,event=branch
+            type=ref,event=branch,prefix=${{ matrix.image-tag }}-
             type=ref,event=pr
             type=sha,prefix=${{ matrix.image-tag }}-
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Create manifest list and push
-        working-directory: /tmp/digests/${{ matrix.from-tag }}
+        working-directory: /tmp/digests/${{ matrix.image-tag }}
         run: |
           docker buildx imagetools create $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
             $(printf '${{ env.IMAGE_NAME }}@sha256:%s ' *)
@@ -149,7 +155,7 @@ jobs:
         run: |
           docker buildx imagetools inspect ${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.version }}
 
-  merge-pr:
+  approve-pr:
     name: Merge Pull Request
     runs-on: ubuntu-latest
     needs: [build]
