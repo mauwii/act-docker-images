@@ -15,6 +15,7 @@ ENV PATH="${PATH}:$DOTNET_ROOT"
 RUN curl -sL https://aka.ms/InstallAzureCLIDeb | bash \
     && az extension add -n azure-devops \
     && az bicep install --target-platform "linux-$(if [[ $(dpkg --print-architecture) == "amd64" ]]; then echo x64; else dpkg --print-architecture; fi)" \
+    && az config set bicep.use_binary_from_path=true \
     && rm -rf /var/lib/apt/lists/*
 
 # install bicep-cli
