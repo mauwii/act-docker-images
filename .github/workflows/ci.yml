@@ -66,10 +66,8 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           build-args: |
             FROM_TAG=${{ matrix.from-tag }}
-          cache-from: |
-            type=gha
-            type=gha,key=${{ matrix.platform }}-${{ matrix.from-tag }}
-          cache-to: type=gha,mode=min,key=${{ matrix.platform }}-${{ matrix.from-tag }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
           provenance: false
           github-token: ${{ secrets.GITHUB_TOKEN }}
           outputs: type=image,name=${{ env.IMAGE_NAME }},push-by-digest=true,name-canonical=true,push=${{ github.event_name != 'pull_request' }}
@@ -162,13 +160,13 @@ jobs:
           PR_URL: ${{github.event.pull_request.html_url}}
           GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
 
-      - name: ${{ github.base_ref == 'develop' && 'squash merge' || 'merge' }} PR
-        run: gh pr merge --auto --${{ github.base_ref == 'develop' && 'squash' || 'merge' }} "$PR_URL"
+      - name: Merge PR
+        run: gh pr merge --auto --merge "$PR_URL"
         env:
           PR_URL: ${{github.event.pull_request.html_url}}
           GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
 
-      - name: clean cache
+      - name: Clean cache
         if: ${{ ! contains('refs/heads/main', github.ref) }}
         run: |
           gh extension install actions/gh-actions-cache
