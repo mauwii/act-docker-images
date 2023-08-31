@@ -174,8 +174,8 @@ jobs:
         run: |
           gh extension install actions/gh-actions-cache
 
-          REPO=$(git remote show origin -n | grep h.URL | sed 's/.*://;s/.git$//')
-          BRANCH=${BRANCH-$(git rev-parse --abbrev-ref HEAD)}
+          REPO=${{ github.repository }}
+          BRANCH=${{ github.ref }}
 
           echo "Fetching list of cache key"
           cacheKeysForPR=$(gh actions-cache list -R "${REPO}" -B "${BRANCH}" | cut -f 1)
@@ -188,6 +188,8 @@ jobs:
                   gh actions-cache delete "${cacheKey}" -R "${REPO}" -B "${BRANCH}" --confirm
               done
               echo "Done"
+              ## Restore the fail on error.
+              set -e
           else
               echo "No cache keys found for this PR"
           fi
