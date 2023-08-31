@@ -13,6 +13,7 @@ permissions:
   contents: write
   pull-requests: write
   packages: write
+  actions: write
 
 env:
   IMAGE_NAME: ${{ github.repository_owner }}/ubuntu-act
@@ -160,14 +161,14 @@ jobs:
           PR_URL: ${{github.event.pull_request.html_url}}
           GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
 
-      - name: Merge PR
-        run: gh pr merge --auto --merge "$PR_URL"
-        env:
-          PR_URL: ${{github.event.pull_request.html_url}}
-          GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
+      # - name: Merge PR
+      #   run: gh pr merge --auto --merge "$PR_URL"
+      #   env:
+      #     PR_URL: ${{github.event.pull_request.html_url}}
+      #     GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
 
       - name: Clean cache
-        if: ${{ ! contains('refs/heads/main', github.ref) }}
+        if: ${{ ! contains('refs/heads/main', github.ref) && github.event.pull_request.auto_merge == true }}
         run: |
           gh extension install actions/gh-actions-cache
 
