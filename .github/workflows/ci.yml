@@ -81,7 +81,7 @@ jobs:
 
       - name: Export digest
         run: |
-          mkdir -p /tmp/digests/${{ matrix.from-tag }}
+          mkdir -p /tmp/digests/${{ matrix.image-tag }}
           digest="${{ steps.build.outputs.digest }}"
           touch "/tmp/digests/${{ matrix.image-tag }}/${digest#sha256:}"
 
