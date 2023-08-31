@@ -162,8 +162,36 @@ jobs:
         env:
           PR_URL: ${{github.event.pull_request.html_url}}
           GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
+
       - name: ${{ github.base_ref == 'develop' && 'squash merge' || 'merge' }} PR
         run: gh pr merge --auto --${{ github.base_ref == 'develop' && 'squash' || 'merge' }} "$PR_URL"
         env:
           PR_URL: ${{github.event.pull_request.html_url}}
           GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
+
+      - name: clean cache
+        if: ${{ ! contains(fromJson('["refs/heads/main","refs/heads/develop"]'), github.ref) }}
+        run: |
+          gh extension install actions/gh-actions-cache
+
+          REPO=${{ github.repository }}
+          BRANCH=${{ github.ref }}
+
+          echo "Fetching list of cache key"
+          cacheKeysForPR=$(gh actions-cache list -R "${REPO}" -B "${BRANCH}" | cut -f 1)
+
+          if [ -z "$cacheKeysForPR" ]; then
+              ## Setting this to not fail the workflow while deleting cache keys.
+              set +e
+              echo "Deleting caches..."
+              for cacheKey in $cacheKeysForPR; do
+                  gh actions-cache delete "${cacheKey}" -R "${REPO}" -B "${BRANCH}" --confirm
+              done
+              echo "Done"
+              ## Restore the fail on error.
+              set -e
+          else
+              echo "No cache keys found for this PR"
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
