@@ -25,13 +25,13 @@ jobs:
     if: github.triggering_actor != 'github-actions[bot]'
     strategy:
       matrix:
-        platform: [linux/amd64, linux/arm64]
-        from-tag: [act-22.04, act-20.04]
         include:
-          - from-tag: act-22.04
-            image-tag: '22.04'
-          - from-tag: act-20.04
-            image-tag: '20.04'
+          - from-version: '22.04'
+            from-distro: 'ubuntu'
+            from-flavor: 'act'
+          - from-version: '20.04'
+            from-distro: 'ubuntu'
+            from-flavor: 'act'
     steps:
       - name: Checkout
         uses: actions/checkout@v3
@@ -55,105 +55,44 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Create metadata for Docker Buildx
+      - name: Create tags for docker buildx
         id: meta
         uses: docker/metadata-action@v4
         with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
           images: |
             ${{ env.IMAGE_NAME }}
             ghcr.io/${{ env.IMAGE_NAME }}
+          tags: |
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' && matrix.from-version == '22.04' }}
+            type=raw,value=${{ matrix.from-version }}
+            type=schedule
+            type=ref,event=branch,prefix=${{ matrix.from-version }}-
+            type=ref,event=pr
+            type=sha,prefix=${{ matrix.from-version }}-
 
-      - name: Build and push by digest
+      - name: Build and push
         id: build
         uses: docker/build-push-action@v4
         with:
           context: .
           file: ./linux/ubuntu/Dockerfile
-          platforms: ${{ matrix.platform}}
+          platforms: linux/amd64,linux/arm64
           labels: ${{ steps.meta.outputs.labels }}
+          tags: ${{ steps.meta.outputs.tags }}
           build-args: |
-            FROM_TAG=${{ matrix.from-tag }}
-          cache-from: type=gha
+            FROM_IMAGE=catthehacker/${{ matrix.from-distro }}
+            FROM_FLAVOR=${{ matrix.from-flavor }}
+            FROM_VERSION=${{ matrix.from-version }}
+            TARGETVERSRION=${{ matrix.from-version }}
+          cache-from: |
+            type=gha,ref=${{ github.ref }}
+            type=gha,ref=refs/heads/main
+            type=gha
           cache-to: type=gha,mode=max
           provenance: false
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          outputs: type=image,name=${{ env.IMAGE_NAME }},push-by-digest=true,name-canonical=true,push=${{ github.event_name != 'pull_request' }}
-
-      - name: Export digest
-        run: |
-          mkdir -p /tmp/digests/${{ matrix.image-tag }}
-          digest="${{ steps.build.outputs.digest }}"
-          touch "/tmp/digests/${{ matrix.image-tag }}/${digest#sha256:}"
-
-      - name: Upload digest
-        uses: actions/upload-artifact@v3
-        with:
-          name: digests
-          path: /tmp/digests/${{ matrix.image-tag }}/*
-          if-no-files-found: error
-          retention-days: 1
-
-  manifests:
-    runs-on: ubuntu-latest
-    needs:
-      - build
-    strategy:
-      matrix:
-        from-tag: [act-22.04, act-20.04]
-        include:
-          - from-tag: act-22.04
-            image-tag: '22.04'
-          - from-tag: act-20.04
-            image-tag: '20.04'
-    if: github.event_name != 'pull_request'
-    steps:
-      - name: Download digests
-        uses: actions/download-artifact@v3
-        with:
-          name: digests
-          path: /tmp/digests/${{ matrix.from-tag }}
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
-
-      - name: Login to GitHub Container Registry
-        uses: docker/login-action@v2
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Login to Docker Hub
-        uses: docker/login-action@v2
-        with:
-          username: ${{ github.actor }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-
-      - name: Create tags for docker buildx
-        id: meta
-        uses: docker/metadata-action@v4
-        with:
-          images: |
-            ${{ env.IMAGE_NAME }}
-            ghcr.io/${{ env.IMAGE_NAME }}
-          tags: |
-            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' && matrix.from-tag == 'act-22.04' }}
-            type=raw,value=${{ matrix.image-tag }}
-            type=schedule
-            type=ref,event=branch,prefix=${{ matrix.image-tag }}-
-            type=ref,event=pr
-            type=sha,prefix=${{ matrix.image-tag }}-
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Create manifest list and push
-        working-directory: /tmp/digests/${{ matrix.image-tag }}
-        run: |
-          docker buildx imagetools create $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
-            $(printf '${{ env.IMAGE_NAME }}@sha256:%s ' *)
-
-      - name: Inspect image
-        run: |
-          docker buildx imagetools inspect ${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.version }}
+          outputs: type=image,name=${{ env.IMAGE_NAME }},push=${{ github.event_name == 'push' }}
 
   approve-pr:
     name: Merge Pull Request
