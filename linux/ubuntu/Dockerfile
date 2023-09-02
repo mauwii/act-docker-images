@@ -14,21 +14,27 @@ SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
 # install dotnet
 ENV DOTNET_ROOT=/opt/hostedtoolcache/dotnet
-ENV PATH="$PATH:$DOTNET_ROOT"
-RUN curl -LO https://dotnet.microsoft.com/download/dotnet/scripts/v1/dotnet-install.sh \
-    && bash ./dotnet-install.sh --install-dir "${DOTNET_ROOT}" --no-path --channel STS \
-    && rm ./dotnet-install.sh
+ENV DOTNET_TOOLS=${DOTNET_ROOT}/tools
+ENV PATH="$PATH:$DOTNET_ROOT:$DOTNET_TOOLS"
+RUN deps=(libc6 libgcc1 libstdc++6 zlib1g libgssapi-krb5-2 ) \
+    && if [[ $FROM_VERSION == "20.04" ]]; then deps+=(libicu60 libssl1.1); fi \
+    && if [[ $FROM_VERSION == "22.04" ]]; then deps+=(libicu70 libssl3 libunwind8); fi \
+    && apt-get update && apt-get install -y --no-install-recommends "${deps[@]}" \
+    && curl -LO https://dot.net/v1/dotnet-install.sh \
+    && chmod +x ./dotnet-install.sh \
+    && bash ./dotnet-install.sh --install-dir ${DOTNET_ROOT} --no-path --channel LTS \
+    && bash ./dotnet-install.sh --install-dir ${DOTNET_ROOT} --no-path --channel STS \
+    && rm -rf ./dotnet-install.sh \
+    && rm -rf /var/lib/apt/lists/*
 
 # Install Powershell
 ARG POWERSHELL_VERSION=7.3.6
-ENV DOTNET_TOOLS=/${DOTNET_ROOT}/tools
 RUN curl -L -o packages-microsoft-prod.deb "https://packages.microsoft.com/config/ubuntu/${FROM_VERSION}/packages-microsoft-prod.deb" \
     && dpkg -i packages-microsoft-prod.deb \
     && rm packages-microsoft-prod.deb \
     && apt-get update \
     && if ! apt-get install -y --no-install-recommends powershell=${POWERSHELL_VERSION}*; then dotnet tool install --tool-path ${DOTNET_TOOLS} --no-cache --version ${POWERSHELL_VERSION} powershell; fi \
     && rm -rf /var/lib/apt/lists/*
-ENV PATH="${PATH}:${DOTNET_TOOLS}"
 
 # # Install Azure Powershell Module v10.2.0
 # RUN pwsh -Command Set-PSRepository -Name PSGallery -InstallationPolicy Trusted \
