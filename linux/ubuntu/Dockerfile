@@ -17,7 +17,7 @@ ENV DOTNET_ROOT=/opt/hostedtoolcache/dotnet
 ENV DOTNET_TOOLS=${DOTNET_ROOT}/tools
 ENV PATH="$PATH:$DOTNET_ROOT:$DOTNET_TOOLS"
 RUN deps=(libc6 libgcc1 libstdc++6 zlib1g libgssapi-krb5-2 ) \
-    && if [[ $FROM_VERSION == "20.04" ]]; then deps+=(libicu60 libssl1.1); fi \
+    && if [[ $FROM_VERSION == "20.04" ]]; then deps+=(libicu66 libssl1.1); fi \
     && if [[ $FROM_VERSION == "22.04" ]]; then deps+=(libicu70 libssl3 libunwind8); fi \
     && apt-get update && apt-get install -y --no-install-recommends "${deps[@]}" \
     && curl -LO https://dot.net/v1/dotnet-install.sh \
