@@ -65,7 +65,7 @@ jobs:
             ghcr.io/${{ env.IMAGE_NAME }}
           tags: |
             type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' && matrix.from-version == '22.04' }}
-            type=raw,value=${{ matrix.from-version }}
+            type=raw,value=${{ matrix.from-version }},enable=${{ github.ref == 'refs/heads/main' }}
             type=schedule
             type=ref,event=branch,prefix=${{ matrix.from-version }}-
             type=ref,event=pr
@@ -84,7 +84,6 @@ jobs:
             FROM_IMAGE=catthehacker/${{ matrix.from-distro }}
             FROM_FLAVOR=${{ matrix.from-flavor }}
             FROM_VERSION=${{ matrix.from-version }}
-            TARGETVERSRION=${{ matrix.from-version }}
           cache-from: |
             type=gha,ref=${{ github.ref }}
             type=gha,ref=refs/heads/main
