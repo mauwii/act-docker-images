@@ -79,14 +79,21 @@ RUN curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | d
     && rm -rf /var/lib/apt/lists/*
 
 # Install Azure CLI
-RUN curl -sL https://aka.ms/InstallAzureCLIDeb | bash \
-    && az extension add -n azure-devops \
-    && az bicep install --target-platform "linux-$(cat /tmp/targetproc)" \
-    && az config set bicep.use_binary_from_path=true \
-    && az config set auto-upgrade.enable=no \
-    && az config set auto-upgrade.prompt=no \
-    && az config set core.collect_telemetry=false \
-    && rm -rf /var/lib/apt/lists/*
+# hadolint ignore=DL3008
+RUN [[ $(curl -sL https://packages.microsoft.com/repos/azure-cli/dists/) =~ $(lsb_release -cs) ]] \
+    && (curl -sL https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor >/etc/apt/trusted.gpg.d/microsoft.gpg \
+        && echo "deb [arch=$(dpkg --print-architecture)] https://packages.microsoft.com/repos/azure-cli/ $(lsb_release -cs) main" \
+            >/etc/apt/sources.list.d/azure-cli.list \
+        && apt-get update \
+        && apt-get install -y --no-install-recommends azure-cli \
+        && az extension add -n azure-devops \
+        && az bicep install --target-platform "linux-$(cat /tmp/targetproc)" \
+        && az config set bicep.use_binary_from_path=true \
+        && az config set auto-upgrade.enable=no \
+        && az config set auto-upgrade.prompt=no \
+        && az config set core.collect_telemetry=false \
+        && rm -rf /var/lib/apt/lists/*) \
+    || echo "Azure CLI not available for this distribution"
 
 # install bicep-cli
 RUN curl -Lo bicep https://github.com/Azure/bicep/releases/latest/download/bicep-linux-"$(cat /tmp/targetproc)" \
