@@ -1,0 +1,25 @@
+name: Docker-Hub description
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - ./README.md
+      - ./dockerhub-description.yml
+
+jobs:
+  dockerHubDescription:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    name:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Docker Hub Description
+        uses: peter-evans/dockerhub-description@v3
+        with:
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          repository: ${{ github.repository_owner }}/ubuntu-act
+          short-description: ${{ github.event.repository.description }}
+          enable-url-completion: true
