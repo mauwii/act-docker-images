@@ -106,7 +106,7 @@ jobs:
       with:
         username: ${{ github.repository_owner }}
         password: ${{ secrets.DOCKERHUB_TOKEN }}
-        repository: peterevans/dockerhub-description
+        repository: ${{ env.IMAGE_NAME }}
         short-description: ${{ github.event.repository.description }}
         enable-url-completion: true
 
