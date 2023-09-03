@@ -22,6 +22,8 @@ Add this to your `~/.actrc`:
 -P ubuntu-20.04=mauwii/ubuntu-act:20.04
 ```
 
+For further Informations checkout the [nektos documentation:book:](https://nektosact.com/beginner/index.html)
+
 ## :warning: Could change frequently :warning:
 
 ...so please do not use this anywhere in production
