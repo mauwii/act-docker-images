@@ -44,10 +44,7 @@ RUN sed 's|"||g' -i "/etc/environment" \
     && echo "DEPLOYMENT_BASEPATH=/opt/runner" | tee -a "/etc/environment" \
     && echo "LSB_OS_VERSION=${FROM_VERSION_MAJOR}${FROM_VERSION_MINOR}" | tee -a "/etc/environment" \
     && echo "USER=$(whoami)" | tee -a "/etc/environment" \
-    && echo "RUNNER_USER=$(whoami)" | tee -a "/etc/environment" \
-    && mkdir /imagegeneration \
-    && curl -sL -o "/imagegeneration/toolset.json" "https://raw.githubusercontent.com/actions/virtual-environments/main/images/linux/toolsets/toolset-${FROM_VERSION_MAJOR}${FROM_VERSION_MINOR}.json" || echo "File not available" \
-    && curl -sL -o "/imagegeneration/LICENSE" "https://raw.githubusercontent.com/actions/virtual-environments/main/LICENSE"
+    && echo "RUNNER_USER=$(whoami)" | tee -a "/etc/environment"
 
 # add ssh keys of github and azure devops
 # hadolint ignore=SC2174
@@ -57,16 +54,24 @@ RUN mkdir -m 0700 -p ~/.ssh \
 
 # Install Git-LFS
 RUN curl -Ls https://packagecloud.io/install/repositories/github/git-lfs/script.deb.sh | bash \
-    && apt-get install -y --no-install-recommends --no-install-suggests git-lfs \
+    &&  apt-get -yq install --no-install-recommends --no-install-suggests git-lfs \
     && rm -rf /var/lib/apt/lists/*
 
 # Install dependencies
-RUN apt-get update \
+RUN  apt-get -yq update \
     && packages=("ssh" "gawk" "curl" "jq" "wget" "sudo" "gnupg-agent" "ca-certificates" "software-properties-common" "apt-transport-https" "libyaml-0-2" "zstd" "zip" "unzip" "xz-utils") \
-    && apt-get -yq install \
+    &&  apt-get -yq install \
         --no-install-recommends \
         --no-install-suggests \
         "${packages[@]}" \
+    && rm -rf /var/lib/apt/lists/*
+
+# install apt packages from toolset
+COPY linux/${DISTRO}/toolsets/${FROM_VERSION_MAJOR}${FROM_VERSION_MINOR}.json /imagegeneration/toolset.json
+# hadolint ignore=SC2207
+RUN  apt-get -yq update \
+    && packages=() && packages+=($(jq -r '.apt|.vital_packages[],.common_packages[],.cmd_packages[]' </imagegeneration/toolset.json)) \
+    &&  apt-get -yq install --no-install-recommends --no-upgrade "${packages[@]}" \
     && ln -s "$(which python3)" "/usr/local/bin/python" \
     && rm -rf /var/lib/apt/lists/*
 
@@ -75,8 +80,8 @@ RUN echo "deb https://packages.microsoft.com/ubuntu/$(lsb_release -rs)/prod $(ls
     | tee /etc/apt/sources.list.d/microsoft-prod.list \
     && curl -sL https://packages.microsoft.com/keys/microsoft.asc \
     | gpg --dearmor >/etc/apt/trusted.gpg.d/microsoft.gpg \
-    && apt-get update \
-    && apt-get -yq install --no-install-recommends --no-install-suggests \
+    &&  apt-get -yq update \
+    &&  apt-get -yq install --no-install-recommends --no-install-suggests \
         moby-cli \
         moby-buildx \
         moby-compose \
@@ -117,7 +122,7 @@ RUN export fromVersion=${FROM_VERSION} \
     && deps=("libc6" "libgcc1" "libgssapi-krb5-2" "libstdc++6" "zlib1g") \
     && if [ "${fromVersion}" = "20.04" ]; then deps+=("libicu66" "libssl1.1"); fi \
     && if [ "${fromVersion}" = "22.04" ]; then deps+=("libicu70" "libssl3" "libunwind8"); fi \
-    && apt-get update && apt-get install -y --no-install-recommends --no-upgrade "${deps[@]}" \
+    &&  apt-get -yq update &&  apt-get -yq install --no-install-recommends --no-upgrade "${deps[@]}" \
     && curl -L https://dot.net/v1/dotnet-install.sh -o dotnet-install.sh \
     && chmod +x ./dotnet-install.sh \
     && ./dotnet-install.sh \
@@ -162,8 +167,8 @@ RUN export azVersion=10.2.0 \
 RUN curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg \
     && chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg \
     && echo "deb [arch=$TARGETARCH signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | tee /etc/apt/sources.list.d/github-cli.list >/dev/null \
-    && apt-get update \
-    && apt-get install -y --no-install-recommends gh \
+    &&  apt-get -yq update \
+    &&  apt-get -yq install --no-install-recommends gh \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Azure CLI
@@ -171,8 +176,8 @@ RUN [[ $(curl -sL https://packages.microsoft.com/repos/azure-cli/dists/) =~ $(ls
     && (curl -sL https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor >/etc/apt/trusted.gpg.d/microsoft.gpg \
         && echo "deb [arch=$(dpkg --print-architecture)] https://packages.microsoft.com/repos/azure-cli/ $(lsb_release -cs) main" \
             >/etc/apt/sources.list.d/azure-cli.list \
-        && apt-get update \
-        && apt-get install -y --no-install-recommends azure-cli \
+        &&  apt-get -yq update \
+        &&  apt-get -yq install --no-install-recommends azure-cli \
         && az extension add -n azure-devops \
         && az bicep install --target-platform "linux-$(cat /tmp/targetproc)" \
         && az config set bicep.use_binary_from_path=true \
@@ -188,7 +193,7 @@ RUN curl -Lo bicep https://github.com/Azure/bicep/releases/latest/download/bicep
     && mv ./bicep /usr/local/bin/bicep
 
 # cleanup step
-RUN apt-get clean \
+RUN  apt-get -yq clean \
     && rm -rf \
         /var/cache/* \
         /var/log/* \
