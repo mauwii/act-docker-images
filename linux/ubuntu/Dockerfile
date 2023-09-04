@@ -90,7 +90,7 @@ RUN echo "deb https://packages.microsoft.com/ubuntu/$(lsb_release -rs)/prod $(ls
     && rm -rf /var/lib/apt/lists/*
 
 # Install Node.js
-# hadolint ignore=SC2174
+# hadolint ignore=SC2174,DL3016
 RUN <<EOF
 IFS=' ' read -r -a NODE <<<"$NODE_VERSION"
 for ver in "${NODE[@]}"; do
@@ -107,6 +107,15 @@ for ver in "${NODE[@]}"; do
         ln -s "$NODEPATH/bin/node" /usr/bin/node
     fi
     export PATH="$NODEPATH/bin:$PATH"
+    # install packages from toolset
+    packages=()
+    while IFS='' read -r line; do
+        packages+=("$line")
+    done < <(jq -r '.node_modules[].name' /imagegeneration/toolset.json)
+    for package in "${packages[@]}"; do
+        npm install -g "$package"
+    done
+    npm cache clean --force
 done
 EOF
 
