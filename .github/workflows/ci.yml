@@ -108,9 +108,6 @@ jobs:
             FROM_FLAVOR=${{ matrix.from-flavor }}
             DISTRO=${{ matrix.distro }}
             CODENAME=${{ matrix.codename }}
-            BUILD_OWNER=${{ github.repository_owner }}
-            BUILD_REPO=${{ github.repository }}
-            BUILD_DATE=${{ steps.date.outputs.date }}
           cache-from: |
             type=registry,ref=docker.io/${{ env.IMAGE_NAME }}
             type=gha
