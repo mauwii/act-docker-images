@@ -89,7 +89,7 @@ RUN echo "deb https://packages.microsoft.com/ubuntu/$(lsb_release -rs)/prod $(ls
     && docker buildx version \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Node.js
+# Install Node.js and toolset packages
 # hadolint ignore=SC2174,DL3016
 RUN <<EOF
 IFS=' ' read -r -a NODE <<<"$NODE_VERSION"
@@ -103,20 +103,18 @@ for ver in "${NODE[@]}"; do
     rm "node-$VER-linux-$(cat /tmp/targetproc).tar.xz"
     if [[ "${ver}" == "18" ]]; then  # make this version the default (latest LTS)
         sed "s|^PATH=|PATH=$NODEPATH/bin:|mg" -i /etc/environment
-        # ToDo: Find out how act is creating the path variable
-        ln -s "$NODEPATH/bin/node" /usr/bin/node
+        ln -s "$NODEPATH/bin/node" /usr/local/bin/node
     fi
     export PATH="$NODEPATH/bin:$PATH"
-    # install packages from toolset
-    packages=()
-    while IFS='' read -r line; do
-        packages+=("$line")
-    done < <(jq -r '.node_modules[].name' /imagegeneration/toolset.json)
-    for package in "${packages[@]}"; do
-        npm install -g "$package"
-    done
-    npm cache clean --force
 done
+# install packages from toolset
+packages=()
+while IFS='' read -r line; do packages+=("$line"); done < <(jq -r '.node_modules[].name' /imagegeneration/toolset.json)
+npm update -g npm
+npm install -g "${packages[@]}"
+chmod -R 777 /usr/local/lib/node_modules
+chmod -R 777 /usr/local/bin
+npm cache clean --force
 EOF
 
 # Set .NET related environment variables

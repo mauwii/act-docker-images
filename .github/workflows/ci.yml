@@ -80,7 +80,7 @@ jobs:
             type=schedule
             type=ref,event=branch,prefix=${{ matrix.from-version }}-
             type=ref,event=pr
-            type=sha,prefix=${{ matrix.from-version }}-
+            type=sha,prefix=${{ matrix.from-version }}-,enable=${{ github.ref == 'refs/heads/main' }}
           labels: |
             org.opencontainers.image.created=${{ steps.date.outputs.date }}
             org.opencontainers.image.vendor=${{ github.repository_owner }}
