@@ -82,15 +82,15 @@ jobs:
             type=ref,event=pr
             type=sha,prefix=${{ matrix.from-version }}-
           labels: |
-            org.opencontainers.image.created="${{ steps.date.outputs.date }}"
-            org.opencontainers.image.vendor="${{ github.repository_owner }}"
-            org.opencontainers.image.authors="['${{ github.repositoryUrl}}','${{ github.actor }}']"
-            org.opencontainers.image.url="https://github.com/${{ github.repository }}/tree/${{ github.head_ref || github.ref_name }}/linux/${{ matrix.distro }}/"
-            org.opencontainers.image.source="${{ github.repositoryUrl }}"
-            org.opencontainers.image.documentation="${{ github.repositoryUrl }}"
-            org.opencontainers.image.title="${{ env.IMAGE_NAME }}-${{ github.base_ref || github.ref_name }}"
-            org.opencontainers.image.description="${{ github.event.repository.description }}"
-            org.opencontainers.image.revision="${{ github.sha }}"
+            org.opencontainers.image.created=${{ steps.date.outputs.date }}
+            org.opencontainers.image.vendor=${{ github.repository_owner }}
+            org.opencontainers.image.authors=['${{ github.repositoryUrl}}','${{ github.actor }}']
+            org.opencontainers.image.url=https://github.com/${{ github.repository }}/tree/${{ github.head_ref || github.ref_name }}/linux/${{ matrix.distro }}/
+            org.opencontainers.image.source=${{ github.repositoryUrl }}
+            org.opencontainers.image.documentation=${{ github.repositoryUrl }}
+            org.opencontainers.image.title=${{ env.IMAGE_NAME }}-${{ github.base_ref || github.ref_name }}
+            org.opencontainers.image.description=${{ github.event.repository.description }}
+            org.opencontainers.image.revision=${{ github.sha }}
 
       - name: Build and push
         id: build
