@@ -110,7 +110,7 @@ for ver in "${NODE[@]}"; do
 done
 EOF
 
-# install .NET SDK LTS
+# Set .NET related environment variables
 ENV DOTNET_ROOT=${AGENT_TOOLSDIRECTORY}/dotnet
 ENV PATH=${DOTNET_ROOT}:${PATH}
 ENV DOTNET_GENERATE_ASPNET_CERTIFICATE=false
@@ -118,6 +118,8 @@ ENV DOTNET_NOLOGO=true
 ENV DOTNET_SDK_VERSION=6.0.413
 ENV DOTNET_USE_POLLING_FILE_WATCHER=true
 ENV NUGET_XMLDOC_MODE=skip
+
+# install .NET SDK LTS
 RUN export fromVersion=${FROM_VERSION} \
     && deps=("libc6" "libgcc1" "libgssapi-krb5-2" "libstdc++6" "zlib1g") \
     && if [ "${fromVersion}" = "20.04" ]; then deps+=("libicu66" "libssl1.1"); fi \
@@ -154,13 +156,9 @@ RUN export powershell_version=7.2.13 \
 
 # # Trust PSGallery and install Azure Powershell Modules
 RUN export azVersion=10.2.0 \
-    && pwsh \
-        -NonInteractive \
-        -NoProfile \
+    && pwsh -NonInteractive -NoProfile \
         -Command "Set-PSRepository -Name PSGallery -InstallationPolicy Trusted" \
-    && pwsh \
-        -NonInteractive \
-        -NoProfile \
+    && pwsh -NonInteractive -NoProfile \
         -Command "Install-Module -Name Az -RequiredVersion ${azVersion} -Scope AllUsers -Repository PSGallery"
 
 # Install Github CLI
