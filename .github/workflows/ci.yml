@@ -28,10 +28,16 @@ jobs:
       matrix:
         include:
           - from-version: '22.04'
-            from-distro: 'ubuntu'
+            from-version-major: '22'
+            from-version-minor: '04'
+            distro: 'ubuntu'
+            codename: 'jammy'
             from-flavor: 'act'
           - from-version: '20.04'
-            from-distro: 'ubuntu'
+            from-version-major: '20'
+            from-version-minor: '04'
+            distro: 'ubuntu'
+            codename: 'focal'
             from-flavor: 'act'
     steps:
       - name: Checkout
@@ -56,6 +62,10 @@ jobs:
           username: ${{ github.repository_owner }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
+      - name: Get current date
+        id: date
+        run: echo "date=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> $GITHUB_OUTPUT
+
       - name: Create tags for docker buildx
         id: meta
         uses: docker/metadata-action@v4
@@ -70,7 +80,17 @@ jobs:
             type=schedule
             type=ref,event=branch,prefix=${{ matrix.from-version }}-
             type=ref,event=pr
-            type=sha,prefix=${{ matrix.from-version }}-
+            type=sha,prefix=${{ matrix.from-version }}-,enable=${{ github.ref == 'refs/heads/main' }}
+          labels: |
+            org.opencontainers.image.created=${{ steps.date.outputs.date }}
+            org.opencontainers.image.vendor=${{ github.repository_owner }}
+            org.opencontainers.image.authors=['${{ github.repositoryUrl}}','${{ github.actor }}']
+            org.opencontainers.image.url=https://github.com/${{ github.repository }}/tree/${{ github.head_ref || github.ref_name }}/linux/${{ matrix.distro }}/
+            org.opencontainers.image.source=${{ github.repositoryUrl }}
+            org.opencontainers.image.documentation=${{ github.repositoryUrl }}
+            org.opencontainers.image.title=${{ env.IMAGE_NAME }}-${{ github.base_ref || github.ref_name }}
+            org.opencontainers.image.description=${{ github.event.repository.description }}
+            org.opencontainers.image.revision=${{ github.sha }}
 
       - name: Build and push
         id: build
@@ -82,17 +102,20 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           tags: ${{ steps.meta.outputs.tags }}
           build-args: |
-            FROM_IMAGE=catthehacker/${{ matrix.from-distro }}
+            FROM_IMAGE=buildpack-deps
+            FROM_VERSION_MAJOR=${{ matrix.from-version-major }}
+            FROM_VERSION_MINOR=${{ matrix.from-version-minor }}
             FROM_FLAVOR=${{ matrix.from-flavor }}
-            FROM_VERSION=${{ matrix.from-version }}
+            DISTRO=${{ matrix.distro }}
+            CODENAME=${{ matrix.codename }}
           cache-from: |
-            type=gha,ref=${{ github.ref }}
-            type=gha,ref=refs/heads/main
-            type=gha
-          cache-to: type=gha,mode=max
+            type=registry,ref=docker.io/${{ env.IMAGE_NAME }}:${{ github.head_ref || github.ref_name }}
+            type=registry,ref=docker.io/${{ env.IMAGE_NAME }}:${{ matrix.codename }}-cache
+          cache-to: |
+            type=registry,ref=docker.io/${{ env.IMAGE_NAME }}:${{ matrix.codename }}-cache,mode=max
           provenance: false
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          outputs: type=image,name=${{ env.IMAGE_NAME }},push=${{ github.event_name == 'push' }}
+          outputs: type=image,name=${{ env.IMAGE_NAME }},oci-mediatypes=true,push=${{ github.event_name == 'push' }}
 
   approve-pr:
     name: Approve PR
