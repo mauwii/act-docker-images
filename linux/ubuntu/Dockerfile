@@ -110,8 +110,7 @@ done
 # install packages from toolset
 packages=()
 while IFS='' read -r line; do packages+=("$line"); done < <(jq -r '.node_modules[].name' /imagegeneration/toolset.json)
-npm update -g npm
-npm install -g "${packages[@]}"
+for package in "${packages[@]}"; do npm install -g "$package"; done
 chmod -R 777 $NODEPATH/lib/node_modules
 chmod -R 777 $NODEPATH/bin
 npm cache clean --force
