@@ -109,9 +109,10 @@ jobs:
             DISTRO=${{ matrix.distro }}
             CODENAME=${{ matrix.codename }}
           cache-from: |
-            type=registry,ref=docker.io/${{ env.IMAGE_NAME }}
-            type=gha
-          cache-to: type=gha,mode=max
+            type=registry,ref=docker.io/${{ env.IMAGE_NAME }}:${{ github.head_ref || github.ref_name }}
+            type=registry,ref=docker.io/${{ env.IMAGE_NAME }}:${{ matrix.codename }}-cache
+          cache-to: |
+            type=registry,ref=docker.io/${{ env.IMAGE_NAME }}:${{ matrix.codename }}-cache,mode=max
           provenance: false
           github-token: ${{ secrets.GITHUB_TOKEN }}
           outputs: type=image,name=${{ env.IMAGE_NAME }},oci-mediatypes=true,push=${{ github.event_name == 'push' }}
