@@ -121,20 +121,20 @@ RUN export fromVersion=${FROM_VERSION} \
 
 # Install PowerShell global tool
 RUN export powershell_version=7.2.13 \
+    && export tool_path=/usr/share/powershell \
     && curl -fSL \
         --output PowerShell.Linux."$(cat /tmp/targetproc)".${powershell_version}.nupkg \
         https://pwshtool.blob.core.windows.net/tool/${powershell_version}/PowerShell.Linux."$(cat /tmp/targetproc)".${powershell_version}.nupkg \
-    && mkdir -p /usr/share/powershell \
     && dotnet tool install \
         --add-source / \
-        --tool-path /usr/share/powershell \
+        --tool-path "${tool_path}" \
         --version ${powershell_version} \
         PowerShell.Linux."$(cat /tmp/targetproc)" \
     && dotnet nuget locals all --clear \
     && rm PowerShell.Linux."$(cat /tmp/targetproc)".${powershell_version}.nupkg \
-    && ln -s /usr/share/powershell/pwsh /usr/bin/pwsh \
-    && chmod 755 /usr/share/powershell/pwsh \
-    && find /usr/share/powershell -print | grep -i '.*[.]nupkg$' | xargs rm
+    && ln -s "${tool_path}/pwsh" /usr/bin/pwsh \
+    && chmod 755 "${tool_path}/pwsh" \
+    && find "${tool_path}" -print | grep -i '.*[.]nupkg$' | xargs rm
 
 # Install Github CLI
 RUN curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
@@ -190,9 +190,8 @@ RUN apt-get -yq update \
 RUN curl -fsSL https://raw.githubusercontent.com/tj/n/master/bin/n -o ~/n \
     && defaultVersion=$(jq -r '.node.default' ${TOOLSET}) \
     && bash ~/n "${defaultVersion}" \
-    && while IFS='' read -r node_module; do npm install -g "${node_module}"; done < <(jq -r '.node_modules[].name' ${TOOLSET}) \
-    && echo "Creating the symlink for [now] command to vercel CLI" \
-    && ln -s /usr/local/bin/vercel /usr/local/bin/now \
+    && while IFS='' read -r node_module; do echo "installing ${node_module}" && npm install -g "${node_module}"; done < <(jq -r '.node_modules[].name' ${TOOLSET}) \
+    && echo "Creating the symlink for [now] command to vercel CLI" && ln -s /usr/local/bin/vercel /usr/local/bin/now \
     && chmod -R 777 /usr/local/lib/node_modules \
     && chmod -R 777 /usr/local/bin \
     && rm -rf ~/n
