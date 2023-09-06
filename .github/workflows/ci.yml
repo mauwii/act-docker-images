@@ -114,6 +114,7 @@ jobs:
           cache-to: |
             type=registry,ref=docker.io/${{ env.IMAGE_NAME }}:${{ matrix.codename }}-cache,mode=max
           provenance: false
+          sbom: true
           github-token: ${{ secrets.GITHUB_TOKEN }}
           outputs: type=image,name=${{ env.IMAGE_NAME }},oci-mediatypes=true,push=${{ github.event_name == 'push' && github.triggering_actor != 'dependabot[bot]' }}
 
