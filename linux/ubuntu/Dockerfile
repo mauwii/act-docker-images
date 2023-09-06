@@ -4,20 +4,18 @@ ARG FROM_IMAGE=buildpack-deps
 ARG FROM_VERSION_MAJOR=22
 ARG FROM_VERSION_MINOR=04
 ARG FROM_VERSION=${FROM_VERSION_MAJOR}.${FROM_VERSION_MINOR}
-FROM --platform=$TARGETPLATFORM ${FROM_IMAGE}:${FROM_VERSION} AS base
+FROM --platform=$TARGETPLATFORM ${FROM_IMAGE}:${FROM_VERSION}
 
-# > automatic buildx ARGs
+# automatic buildx ARGs
 ARG TARGETARCH
 
-# > ARGs before FROM are not accessible
+# ARGs used before `FROM` are not accessible afterwards
 ARG FROM_IMAGE
 ARG FROM_VERSION_MAJOR
 ARG FROM_VERSION_MINOR
 ARG FROM_VERSION=${FROM_VERSION_MAJOR}.${FROM_VERSION_MINOR}
 
-# > Our custom ARGs
-# latest Node.js LTS versions
-ARG NODE_VERSION="16 18"
+# Our custom ARGs
 ARG DISTRO=ubuntu
 ARG CODENAME
 ARG TYPE=act
