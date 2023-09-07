@@ -58,11 +58,13 @@ RUN apt-get -yq update \
     && apt-get -yq install --no-install-recommends --no-install-suggests \
         "${packages[@]}" \
     && apt-get clean \
+    && rm -rf /etc/apt/sources.list.d/* \
     && rm -rf /var/lib/apt/lists/*
 
 # Install apt-fast
 RUN bash -c "$(curl -fsSL https://raw.githubusercontent.com/ilikenwf/apt-fast/master/quick-install.sh)" \
     && apt-get clean \
+    && rm -rf /etc/apt/sources.list.d/* \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Git-LFS
@@ -70,6 +72,7 @@ RUN curl -Ls https://packagecloud.io/install/repositories/github/git-lfs/script.
     && apt-get -yq install --no-install-recommends --no-install-suggests \
         git-lfs \
     && apt-get clean \
+    && rm -rf /etc/apt/sources.list.d/* \
     && rm -rf /var/lib/apt/lists/*
 
 # Install docker cli
@@ -85,6 +88,7 @@ RUN echo "deb https://packages.microsoft.com/ubuntu/$(lsb_release -rs)/prod $(ls
     && docker -v \
     && docker buildx version \
     && apt-get clean \
+    && rm -rf /etc/apt/sources.list.d/* \
     && rm -rf /var/lib/apt/lists/*
 
 # Set .NET related environment variables
@@ -117,6 +121,7 @@ RUN export fromVersion=${FROM_VERSION} \
     && dotnet --info \
     && sed "s|^PATH=|PATH=${DOTNET_ROOT}:|mg" -i /etc/environment \
     && apt-get clean \
+    && rm -rf /etc/apt/sources.list.d/* \
     && rm -rf /var/lib/apt/lists/*
 
 # Install PowerShell global tool
@@ -146,6 +151,7 @@ RUN curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
     && apt-get -yq install --no-install-recommends \
         gh \
     && apt-get clean \
+    && rm -rf /etc/apt/sources.list.d/* \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Azure CLI
@@ -163,6 +169,7 @@ RUN [[ $(curl -sL https://packages.microsoft.com/repos/azure-cli/dists/) =~ $(ls
         && az config set auto-upgrade.prompt=no \
         && az config set core.collect_telemetry=false \
         && apt-get clean \
+        && rm -rf /etc/apt/sources.list.d/* \
         && rm -rf /var/lib/apt/lists/*) \
     || echo "Azure CLI not available for this distribution"
 
@@ -183,6 +190,7 @@ RUN apt-get -yq update \
     && apt-get -yq install --no-install-recommends --no-upgrade \
         "${packages[@]}" \
     && apt-get clean \
+    && rm -rf /etc/apt/sources.list.d/* \
     && rm -rf /var/lib/apt/lists/*
 
 # Install default NodeJS and toolset node_modules
