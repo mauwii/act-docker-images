@@ -37,9 +37,12 @@ jobs:
             from-flavor: 'act'
     env:
       IMAGE_NAME: ${{ github.repository_owner }}/ubuntu-act
+      SHA: ${{ github.event.pull_request.head.sha || github.event.after }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: ${{ env.SHA }}
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v2
@@ -48,15 +51,16 @@ jobs:
         uses: docker/setup-buildx-action@v2
 
       - name: Login to GitHub Container Registry
-        uses: docker/login-action@v2
+        uses: docker/login-action@v2.1.0
         with:
           registry: ghcr.io
           username: ${{ github.repository_owner }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Login to Docker Hub
-        uses: docker/login-action@v2
+        uses: docker/login-action@v2.1.0
         with:
+          registry: docker.io
           username: ${{ github.repository_owner }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
@@ -66,7 +70,7 @@ jobs:
 
       - name: Create tags for docker buildx
         id: meta
-        uses: docker/metadata-action@v4
+        uses: docker/metadata-action@v4.4.0
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           images: |
@@ -88,7 +92,7 @@ jobs:
             org.opencontainers.image.documentation=${{ github.repositoryUrl }}
             org.opencontainers.image.title=${{ env.IMAGE_NAME }}-${{ github.base_ref || github.ref_name }}
             org.opencontainers.image.description=${{ github.event.repository.description }}
-            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.revision=${{ env.SHA }}
 
       - name: Build and push
         id: build
@@ -117,6 +121,20 @@ jobs:
           sbom: true
           push: ${{ github.event_name == 'push' && ! contains(fromJson('["dependabot[bot]","nektos/act"]'),github.actor) && env.GITHUB_ACTOR != 'nektos/act' }}
           outputs: type=image,name=${{ env.IMAGE_NAME }},oci-mediatypes=true
+
+      - name: Docker Scout
+        id: docker-scout
+        if: ${{ github.event_name == 'pull_request' }}
+        uses: docker/scout-action@v0.23.2
+        with:
+          command: quickview,compare
+          image: ${{ steps.meta.outputs.tags }}
+          to-latest: true
+          ignore-unchanged: true
+          only-severities: critical,high
+          organization: mauwii
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          write-comment: true
 
   approve-pr:
     name: Approve PR
