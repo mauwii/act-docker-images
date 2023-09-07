@@ -1,0 +1,20 @@
+{
+	"[dockerfile]": {
+		"editor.quickSuggestions": {
+			"strings": true
+		}
+	},
+	"[markdown]": {
+		"diffEditor.ignoreTrimWhitespace": false,
+		"editor.defaultFormatter": "esbenp.prettier-vscode",
+		"editor.quickSuggestions": {
+			"comments": "off",
+			"other": "off",
+			"strings": "off"
+		},
+		"editor.unicodeHighlight.ambiguousCharacters": false,
+		"editor.unicodeHighlight.invisibleCharacters": false,
+		"editor.wordWrap": "on"
+	},
+	"shellformat.flag": "--indent 4 --binary-next-line --case-indent"
+}
