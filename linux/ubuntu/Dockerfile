@@ -1,29 +1,29 @@
 # syntax=docker/dockerfile:1
-
 ARG FROM_IMAGE=buildpack-deps
 ARG FROM_VERSION_MAJOR=22
 ARG FROM_VERSION_MINOR=04
 ARG FROM_VERSION=${FROM_VERSION_MAJOR}.${FROM_VERSION_MINOR}
-FROM --platform=$TARGETPLATFORM ${FROM_IMAGE}:${FROM_VERSION} AS base
+FROM --platform=$TARGETPLATFORM ${FROM_IMAGE}:${FROM_VERSION}
 
-# > automatic buildx ARGs
+# automatic buildx ARGs
 ARG TARGETARCH
 
-# > ARGs before FROM are not accessible
+# ARGs used before `FROM` are not accessible afterwards
 ARG FROM_IMAGE
 ARG FROM_VERSION_MAJOR
 ARG FROM_VERSION_MINOR
 ARG FROM_VERSION=${FROM_VERSION_MAJOR}.${FROM_VERSION_MINOR}
 
-# > Our custom ARGs
-# latest Node.js LTS versions
-ARG NODE_VERSION="16 18"
+# Our custom ARGs
 ARG DISTRO=ubuntu
 ARG CODENAME
 ARG TYPE=act
 
-# > Force apt to not be interactive/not ask
+# Force apt to not be interactive/not ask
 ENV DEBIAN_FRONTEND=noninteractive
+
+# set locale
+ENV LANG=C.UTF-8
 
 SHELL [ "/bin/bash", "--login", "-e", "-o", "pipefail", "-c" ]
 WORKDIR /tmp
@@ -36,15 +36,15 @@ RUN export targetarch=${TARGETARCH} \
 # setup environment
 ENV AGENT_TOOLSDIRECTORY=/opt/hostedtoolcache
 RUN sed 's|"||g' -i "/etc/environment" \
-    && echo "IMAGE_OS=${DISTRO}${FROM_VERSION_MAJOR}" | tee -a "/etc/environment" \
-    && echo "ImageOS=${DISTRO}${FROM_VERSION_MAJOR}" | tee -a "/etc/environment" \
-    && echo "LSB_RELEASE=${FROM_VERSION}" | tee -a "/etc/environment" \
-    && echo "AGENT_TOOLSDIRECTORY=${AGENT_TOOLSDIRECTORY}" | tee -a "/etc/environment" \
-    && echo "RUN_TOOL_CACHE=${AGENT_TOOLSDIRECTORY}" | tee -a "/etc/environment" \
-    && echo "DEPLOYMENT_BASEPATH=/opt/runner" | tee -a "/etc/environment" \
-    && echo "LSB_OS_VERSION=${FROM_VERSION_MAJOR}${FROM_VERSION_MINOR}" | tee -a "/etc/environment" \
-    && echo "USER=$(whoami)" | tee -a "/etc/environment" \
-    && echo "RUNNER_USER=$(whoami)" | tee -a "/etc/environment"
+    && echo "IMAGE_OS=${DISTRO}${FROM_VERSION_MAJOR}" | tee -a /etc/environment \
+    && echo "ImageOS=${DISTRO}${FROM_VERSION_MAJOR}" | tee -a /etc/environment \
+    && echo "LSB_RELEASE=${FROM_VERSION}" | tee -a /etc/environment \
+    && echo "AGENT_TOOLSDIRECTORY=${AGENT_TOOLSDIRECTORY}" | tee -a /etc/environment \
+    && echo "RUN_TOOL_CACHE=${AGENT_TOOLSDIRECTORY}" | tee -a /etc/environment \
+    && echo "DEPLOYMENT_BASEPATH=/opt/runner" | tee -a /etc/environment \
+    && echo "LSB_OS_VERSION=${FROM_VERSION_MAJOR}${FROM_VERSION_MINOR}" | tee -a /etc/environment \
+    && echo "USER=$(whoami)" | tee -a /etc/environment \
+    && echo "RUNNER_USER=$(whoami)" | tee -a /etc/environment
 
 # add ssh keys of github and azure devops
 # hadolint ignore=SC2174
@@ -58,11 +58,13 @@ RUN apt-get -yq update \
     && apt-get -yq install --no-install-recommends --no-install-suggests \
         "${packages[@]}" \
     && apt-get clean \
+    && rm -rf /etc/apt/sources.list.d/* \
     && rm -rf /var/lib/apt/lists/*
 
 # Install apt-fast
 RUN bash -c "$(curl -fsSL https://raw.githubusercontent.com/ilikenwf/apt-fast/master/quick-install.sh)" \
     && apt-get clean \
+    && rm -rf /etc/apt/sources.list.d/* \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Git-LFS
@@ -70,6 +72,7 @@ RUN curl -Ls https://packagecloud.io/install/repositories/github/git-lfs/script.
     && apt-get -yq install --no-install-recommends --no-install-suggests \
         git-lfs \
     && apt-get clean \
+    && rm -rf /etc/apt/sources.list.d/* \
     && rm -rf /var/lib/apt/lists/*
 
 # Install docker cli
@@ -85,6 +88,7 @@ RUN echo "deb https://packages.microsoft.com/ubuntu/$(lsb_release -rs)/prod $(ls
     && docker -v \
     && docker buildx version \
     && apt-get clean \
+    && rm -rf /etc/apt/sources.list.d/* \
     && rm -rf /var/lib/apt/lists/*
 
 # Set .NET related environment variables
@@ -117,6 +121,7 @@ RUN export fromVersion=${FROM_VERSION} \
     && dotnet --info \
     && sed "s|^PATH=|PATH=${DOTNET_ROOT}:|mg" -i /etc/environment \
     && apt-get clean \
+    && rm -rf /etc/apt/sources.list.d/* \
     && rm -rf /var/lib/apt/lists/*
 
 # Install PowerShell global tool
@@ -146,6 +151,7 @@ RUN curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
     && apt-get -yq install --no-install-recommends \
         gh \
     && apt-get clean \
+    && rm -rf /etc/apt/sources.list.d/* \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Azure CLI
@@ -163,6 +169,7 @@ RUN [[ $(curl -sL https://packages.microsoft.com/repos/azure-cli/dists/) =~ $(ls
         && az config set auto-upgrade.prompt=no \
         && az config set core.collect_telemetry=false \
         && apt-get clean \
+        && rm -rf /etc/apt/sources.list.d/* \
         && rm -rf /var/lib/apt/lists/*) \
     || echo "Azure CLI not available for this distribution"
 
@@ -183,6 +190,7 @@ RUN apt-get -yq update \
     && apt-get -yq install --no-install-recommends --no-upgrade \
         "${packages[@]}" \
     && apt-get clean \
+    && rm -rf /etc/apt/sources.list.d/* \
     && rm -rf /var/lib/apt/lists/*
 
 # Install default NodeJS and toolset node_modules
