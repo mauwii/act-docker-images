@@ -1,5 +1,4 @@
 # syntax=docker/dockerfile:1
-
 ARG FROM_IMAGE=buildpack-deps
 ARG FROM_VERSION_MAJOR=22
 ARG FROM_VERSION_MINOR=04
@@ -20,8 +19,11 @@ ARG DISTRO=ubuntu
 ARG CODENAME
 ARG TYPE=act
 
-# > Force apt to not be interactive/not ask
+# Force apt to not be interactive/not ask
 ENV DEBIAN_FRONTEND=noninteractive
+
+# set locale
+ENV LANG=C.UTF-8
 
 SHELL [ "/bin/bash", "--login", "-e", "-o", "pipefail", "-c" ]
 WORKDIR /tmp
@@ -34,15 +36,15 @@ RUN export targetarch=${TARGETARCH} \
 # setup environment
 ENV AGENT_TOOLSDIRECTORY=/opt/hostedtoolcache
 RUN sed 's|"||g' -i "/etc/environment" \
-    && echo "IMAGE_OS=${DISTRO}${FROM_VERSION_MAJOR}" | tee -a "/etc/environment" \
-    && echo "ImageOS=${DISTRO}${FROM_VERSION_MAJOR}" | tee -a "/etc/environment" \
-    && echo "LSB_RELEASE=${FROM_VERSION}" | tee -a "/etc/environment" \
-    && echo "AGENT_TOOLSDIRECTORY=${AGENT_TOOLSDIRECTORY}" | tee -a "/etc/environment" \
-    && echo "RUN_TOOL_CACHE=${AGENT_TOOLSDIRECTORY}" | tee -a "/etc/environment" \
-    && echo "DEPLOYMENT_BASEPATH=/opt/runner" | tee -a "/etc/environment" \
-    && echo "LSB_OS_VERSION=${FROM_VERSION_MAJOR}${FROM_VERSION_MINOR}" | tee -a "/etc/environment" \
-    && echo "USER=$(whoami)" | tee -a "/etc/environment" \
-    && echo "RUNNER_USER=$(whoami)" | tee -a "/etc/environment"
+    && echo "IMAGE_OS=${DISTRO}${FROM_VERSION_MAJOR}" | tee -a /etc/environment \
+    && echo "ImageOS=${DISTRO}${FROM_VERSION_MAJOR}" | tee -a /etc/environment \
+    && echo "LSB_RELEASE=${FROM_VERSION}" | tee -a /etc/environment \
+    && echo "AGENT_TOOLSDIRECTORY=${AGENT_TOOLSDIRECTORY}" | tee -a /etc/environment \
+    && echo "RUN_TOOL_CACHE=${AGENT_TOOLSDIRECTORY}" | tee -a /etc/environment \
+    && echo "DEPLOYMENT_BASEPATH=/opt/runner" | tee -a /etc/environment \
+    && echo "LSB_OS_VERSION=${FROM_VERSION_MAJOR}${FROM_VERSION_MINOR}" | tee -a /etc/environment \
+    && echo "USER=$(whoami)" | tee -a /etc/environment \
+    && echo "RUNNER_USER=$(whoami)" | tee -a /etc/environment
 
 # add ssh keys of github and azure devops
 # hadolint ignore=SC2174
