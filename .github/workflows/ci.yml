@@ -101,10 +101,8 @@ jobs:
           context: .
           file: ./linux/ubuntu/Dockerfile
           platforms: linux/amd64,linux/arm64
-          labels: |
-            ${{ steps.meta.outputs.labels }}
-          tags: |
-            ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          tags: ${{ steps.meta.outputs.tags }}
           build-args: |
             FROM_IMAGE=buildpack-deps
             FROM_VERSION_MAJOR=${{ matrix.from-version-major }}
@@ -127,7 +125,7 @@ jobs:
         if: ${{ github.event_name == 'pull_request' }}
         uses: docker/scout-action@v0.23.2
         with:
-          command: quickview,compare
+          command: compare
           image: ${{ steps.meta.outputs.tags }}
           to-latest: true
           ignore-unchanged: true
