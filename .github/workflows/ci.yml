@@ -68,13 +68,13 @@ jobs:
         id: date
         run: echo "date=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> $GITHUB_OUTPUT
 
-      - name: Create tags for docker buildx
+      - name: Extract Docker metadata
         id: meta
         uses: docker/metadata-action@v4.4.0
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           images: |
-            ${{ env.IMAGE_NAME }}
+            docker.io/${{ env.IMAGE_NAME }}
             ghcr.io/${{ env.IMAGE_NAME }}
           tags: |
             type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' && matrix.from-version == '22.04' }}
