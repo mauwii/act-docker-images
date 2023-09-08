@@ -120,8 +120,7 @@ jobs:
             type=registry,ref=${{ format('{0}/{1}', env.REGISTRY, env.IMAGE_REPOSITORY) }}:cache-${{ matrix.codename }},mode=max
           provenance: mode=max
           sbom: true
-          push: true
-          # push: ${{ github.event_name == 'push' && ! contains(fromJson('["dependabot[bot]","nektos/act"]'),github.actor) }}
+          push: ${{ github.event_name == 'push' && ! contains(fromJson('["dependabot[bot]","nektos/act"]'),github.actor) }}
           # outputs: type=image,oci-mediatypes=true,push=true
 
       - name: Docker Scout
