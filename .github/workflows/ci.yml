@@ -118,6 +118,7 @@ jobs:
           provenance: mode=max
           sbom: true
           push: ${{ github.event_name == 'push' && ! contains(fromJson('["dependabot[bot]","nektos/act"]'),github.actor) }}
+          load: true
           # outputs: type=image,oci-mediatypes=true,push=true
 
       - name: Docker Scout
@@ -127,7 +128,7 @@ jobs:
         with:
           command: quickview,compare
           image: ${{ steps.meta.outputs.tags }}
-          to: ${{ format('{0}/{1}:{2}', env.REGISTRY, env.IMAGE_REPOSITORY, matrix.from-version) }}
+          to: ${{ format('{0}/{1}:{2}', env.REGISTRY, env.IMAGE_REPOSITORY, format('{}0-{1}', matrix.from-version, 'main')) }}
           ignore-unchanged: true
           only-severities: critical,high
           github-token: ${{ secrets.GITHUB_TOKEN }}
