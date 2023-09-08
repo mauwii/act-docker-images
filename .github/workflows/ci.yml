@@ -126,7 +126,7 @@ jobs:
         if: ${{ github.event_name == 'pull_request' }}
         uses: docker/scout-action@v0.23.2
         with:
-          command: quickview,compare
+          command: compare
           image: ${{ steps.meta.outputs.tags }}
           to: ${{ format('{0}/{1}:{2}', env.REGISTRY, env.IMAGE_REPOSITORY, matrix.from-version) }}
           ignore-unchanged: true
