@@ -4,10 +4,11 @@ on:
   push:
     paths:
       - '**/Dockerfile'
-      - './README.md'
+      - '**/toolsets/*.json'
   pull_request:
     paths:
       - '**/Dockerfile'
+      - '**/toolsets/*.json'
       - '**/.github/workflows/ci.yml'
 
 permissions:
@@ -36,10 +37,15 @@ jobs:
             codename: 'focal'
             from-flavor: 'act'
     env:
-      IMAGE_NAME: ${{ github.repository_owner }}/ubuntu-act
+      REGISTRY: docker.io
+      IMAGE_NAME: ubuntu-act
+      IMAGE_REPOSITORY: ${{ format('{0}/{1}', github.repository_owner, 'ubuntu-act') }}
+      SHA: ${{ github.event.pull_request.head.sha || github.event.after }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v3.6.0
+        with:
+          ref: ${{ env.SHA }}
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v2
@@ -47,49 +53,47 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
 
-      - name: Login to GitHub Container Registry
-        uses: docker/login-action@v2
-        with:
-          registry: ghcr.io
-          username: ${{ github.repository_owner }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+      # - name: Login to GitHub Container Registry
+      #   uses: docker/login-action@v2.1.0
+      #   with:
+      #     registry: ghcr.io
+      #     username: ${{ github.repository_owner }}
+      #     password: ${{ secrets.GITHUB_TOKEN }}
 
+      # Login against a Docker registry except on PR
+      # https://github.com/docker/login-action
       - name: Login to Docker Hub
-        uses: docker/login-action@v2
+        uses: docker/login-action@v2.2.0
         with:
+          registry: ${{ env.REGISTRY }}
           username: ${{ github.repository_owner }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Get current date
-        id: date
-        run: echo "date=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> $GITHUB_OUTPUT
-
-      - name: Create tags for docker buildx
+      # Extract metadata (tags, labels) for Docker
+      # https://github.com/docker/metadata-action
+      - name: Extract Docker metadata
         id: meta
-        uses: docker/metadata-action@v4
+        uses: docker/metadata-action@v4.4.0
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          images: |
-            ${{ env.IMAGE_NAME }}
-            ghcr.io/${{ env.IMAGE_NAME }}
+          images: ${{ format('{0}/{1}', env.REGISTRY, env.IMAGE_REPOSITORY) }}
           tags: |
-            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' && matrix.from-version == '22.04' }}
-            type=raw,value=${{ matrix.from-version }},enable=${{ github.ref == 'refs/heads/main' }}
-            type=schedule
-            type=ref,event=branch,prefix=${{ matrix.from-version }}-
-            type=ref,event=pr
-            type=sha,prefix=${{ matrix.from-version }}-,enable=${{ github.ref == 'refs/heads/main' }}
+            type=raw,value=${{ matrix.from-version }},enable={{is_default_branch}},priority=900
+            type=raw,value=latest,enable=${{ github.ref == format('refs/heads/{0}', 'main') && matrix.from-version == '22.04' }},priority=700
+            type=ref,event=branch,prefix=${{ matrix.from-version }}-,priority=600
+            type=sha,prefix=${{ matrix.from-version }}-,format=short,priority=100
           labels: |
-            org.opencontainers.image.created=${{ steps.date.outputs.date }}
+            org.opencontainers.image.created={{date 'dddd, MMMM Do YYYY, h:mm:ss a'}}
             org.opencontainers.image.vendor=${{ github.repository_owner }}
-            org.opencontainers.image.authors=['${{ github.repositoryUrl}}','${{ github.actor }}']
-            org.opencontainers.image.url=https://github.com/${{ github.repository }}/tree/${{ github.head_ref || github.ref_name }}/linux/${{ matrix.distro }}/
+            org.opencontainers.image.authors='["${{ github.repositoryUrl}}","${{ github.actor }}"]'
+            org.opencontainers.image.url=https://github.com/${{ github.repository }}/blob/${{ env.SHA }}/linux/${{ matrix.distro }}/Dockerfile
             org.opencontainers.image.source=${{ github.repositoryUrl }}
             org.opencontainers.image.documentation=${{ github.repositoryUrl }}
-            org.opencontainers.image.title=${{ env.IMAGE_NAME }}-${{ github.base_ref || github.ref_name }}
+            org.opencontainers.image.title=${{ env.IMAGE_REPOSITORY }}:${{ github.head_ref || github.ref_name }}
             org.opencontainers.image.description=${{ github.event.repository.description }}
-            org.opencontainers.image.revision=${{ github.sha }}
 
+      # Build and push Docker image with Buildx (don't push on PR)
+      # https://github.com/docker/build-push-action
       - name: Build and push
         id: build
         uses: docker/build-push-action@v4
@@ -97,10 +101,8 @@ jobs:
           context: .
           file: ./linux/ubuntu/Dockerfile
           platforms: linux/amd64,linux/arm64
-          labels: |
-            ${{ steps.meta.outputs.labels }}
-          tags: |
-            ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          tags: ${{ steps.meta.outputs.tags }}
           build-args: |
             FROM_IMAGE=buildpack-deps
             FROM_VERSION_MAJOR=${{ matrix.from-version-major }}
@@ -109,14 +111,28 @@ jobs:
             DISTRO=${{ matrix.distro }}
             CODENAME=${{ matrix.codename }}
           cache-from: |
-            type=registry,ref=docker.io/${{ env.IMAGE_NAME }}:${{ github.head_ref || github.ref_name }}
-            type=registry,ref=docker.io/${{ env.IMAGE_NAME }}:${{ matrix.codename }}-cache
+            type=registry,ref=${{ format('{0}/{1}', env.REGISTRY, env.IMAGE_REPOSITORY) }}:${{ github.head_ref || github.ref_name }}
+            type=registry,ref=${{ format('{0}/{1}', env.REGISTRY, env.IMAGE_REPOSITORY) }}:cache-${{ matrix.codename }}
           cache-to: |
-            type=registry,ref=docker.io/${{ env.IMAGE_NAME }}:${{ matrix.codename }}-cache,mode=max
-          provenance: true
-          sbom: true
-          push: ${{ github.event_name == 'push' && ! contains(fromJson('["dependabot[bot]","nektos/act"]'),github.actor) && env.GITHUB_ACTOR != 'nektos/act' }}
-          outputs: type=image,name=${{ env.IMAGE_NAME }},oci-mediatypes=true
+            type=registry,ref=${{ format('{0}/{1}', env.REGISTRY, env.IMAGE_REPOSITORY) }}:cache-${{ matrix.codename }},mode=max
+          provenance: mode=max
+          push: true
+          # push: ${{ github.event_name == 'push' && ! contains(fromJson('["dependabot[bot]","nektos/act"]'),github.actor) }}
+          # outputs: type=image,oci-mediatypes=true,push=true
+
+      - name: Docker Scout
+        id: docker-scout
+        if: ${{ github.event_name == 'pull_request' }}
+        continue-on-error: true
+        uses: docker/scout-action@v0.23.4
+        with:
+          command: quickview,compare
+          image: ${{ steps.meta.outputs.tags }}
+          to: ${{ format('{0}/{1}:{2}', env.REGISTRY, env.IMAGE_REPOSITORY, format('{0}-{1}', matrix.from-version, 'main')) }}
+          ignore-unchanged: true
+          only-severities: critical,high
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          write-comment: true
 
   approve-pr:
     name: Approve PR

@@ -1,5 +1,13 @@
 # 🐳 Docker images for [nektos/act](https://github.com/nektos/act)
 
+[![Docker Pulls](https://badgen.net/docker/pulls/mauwii/ubuntu-act?icon=docker&label=pulls)](https://hub.docker.com/r/mauwii/ubuntu-act/)
+[![Docker Stars](https://badgen.net/docker/stars/mauwii/ubuntu-act?icon=docker&label=stars)](https://hub.docker.com/r/mauwii/ubuntu-act/)
+[![Docker Image Size](https://badgen.net/docker/size/mauwii/ubuntu-act?icon=docker&label=image%20size)](https://hub.docker.com/r/mauwii/ubuntu-act/)
+[![Github stars](https://badgen.net/github/stars/mauwii/act-docker-images?icon=github&label=stars)](https://github.com/mauwii/act-docker-images)
+[![Github forks](https://badgen.net/github/forks/mauwii/act-docker-images?icon=github&label=forks)](https://github.com/mauwii/act-docker-images)
+[![Github issues](https://img.shields.io/github/issues/mauwii/act-docker-images)](https://github.com/mauwii/act-docker-images/issues)
+[![Github last-commit](https://img.shields.io/github/last-commit/mauwii/act-docker-images)](https://github.com/mauwii/act-docker-images/commits/main/)
+
 ## ⚠️ Heavily under construction... ⚠️
 
 ...so please do not use this anywhere in production ❗
