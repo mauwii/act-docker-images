@@ -83,7 +83,6 @@ jobs:
             type=ref,event=branch,prefix=${{ matrix.from-version }}-,priority=600
             type=sha,prefix=${{ matrix.from-version }}-,format=short,priority=100
           labels: |
-            org.opencontainers.image.revision=${{ env.SHA }}
             org.opencontainers.image.created={{date 'dddd, MMMM Do YYYY, h:mm:ss a'}}
             org.opencontainers.image.vendor=${{ github.repository_owner }}
             org.opencontainers.image.authors='["${{ github.repositoryUrl}}","${{ github.actor }}"]'
@@ -124,7 +123,7 @@ jobs:
       - name: Docker Scout
         id: docker-scout
         if: ${{ github.event_name == 'pull_request' }}
-        uses: docker/scout-action@v0.23.2
+        uses: docker/scout-action@v0.23.4
         with:
           command: quickview,compare
           image: ${{ steps.meta.outputs.tags }}
