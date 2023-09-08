@@ -83,13 +83,12 @@ jobs:
             type=ref,event=branch,prefix=${{ matrix.from-version }}-,priority=600
             type=sha,prefix=${{ matrix.from-version }}-,format=short,priority=100
           labels: |
-            maintainer=${{ github.repository_owner }}
             org.opencontainers.image.revision=${{ env.SHA }}
             org.opencontainers.image.created={{date 'dddd, MMMM Do YYYY, h:mm:ss a'}}
             org.opencontainers.image.vendor=${{ github.repository_owner }}
-            org.opencontainers.image.authors='["${{ github.repositoryUrl}}","${{ github.actor }}"]'
-            org.opencontainers.image.url=https://github.com/${{ github.repository }}/tree/${{ github.base_ref || github.ref_name }}/linux/${{ matrix.distro }}/Dockerfile
-            org.opencontainers.image.source=${{ github.repositoryUrl }}
+            org.opencontainers.image.authors=${{ github.repositoryUrl}}
+            org.opencontainers.image.url=${{ github.repositoryUrl}}
+            org.opencontainers.image.source=${{ github.repositoryUrl}}/blob/${{ env.SHA }}/linux/${{ matrix.distro }}/Dockerfile
             org.opencontainers.image.documentation=${{ github.repositoryUrl }}
             org.opencontainers.image.title=${{ env.IMAGE_REPOSITORY }}:${{ github.head_ref || github.ref_name }}
             org.opencontainers.image.description=${{ github.event.repository.description }}
