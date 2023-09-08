@@ -86,9 +86,9 @@ jobs:
             org.opencontainers.image.revision=${{ env.SHA }}
             org.opencontainers.image.created={{date 'dddd, MMMM Do YYYY, h:mm:ss a'}}
             org.opencontainers.image.vendor=${{ github.repository_owner }}
-            org.opencontainers.image.authors=${{ github.repositoryUrl}}
-            org.opencontainers.image.url=${{ github.repositoryUrl}}
-            org.opencontainers.image.source=${{ github.repositoryUrl}}/blob/${{ env.SHA }}/linux/${{ matrix.distro }}/Dockerfile
+            org.opencontainers.image.authors='["${{ github.repositoryUrl}}","${{ github.actor }}"]'
+            org.opencontainers.image.url=https://github.com/${{ github.repository }}/blob/${{ env.SHA }}/linux/${{ matrix.distro }}/Dockerfile
+            org.opencontainers.image.source=${{ github.repositoryUrl }}
             org.opencontainers.image.documentation=${{ github.repositoryUrl }}
             org.opencontainers.image.title=${{ env.IMAGE_REPOSITORY }}:${{ github.head_ref || github.ref_name }}
             org.opencontainers.image.description=${{ github.event.repository.description }}
@@ -126,7 +126,7 @@ jobs:
         if: ${{ github.event_name == 'pull_request' }}
         uses: docker/scout-action@v0.23.2
         with:
-          command: compare
+          command: quickview,compare
           image: ${{ steps.meta.outputs.tags }}
           to: ${{ format('{0}/{1}:{2}', env.REGISTRY, env.IMAGE_REPOSITORY, matrix.from-version) }}
           ignore-unchanged: true
