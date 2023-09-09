@@ -109,6 +109,8 @@ jobs:
         uses: docker/build-push-action@v4
         with:
           context: .
+          # github-token for the repository context
+          github-token: ${{ secrets.GITHUB_TOKEN }}
           file: ./linux/${{ matrix.distro }}/Dockerfile
           platforms: linux/amd64,linux/arm64
           labels: ${{ steps.meta.outputs.labels }}
@@ -122,20 +124,20 @@ jobs:
             CODENAME=${{ matrix.codename }}
           # caching to speed up the build
           cache-from: |
-            type=registry,ref=${{ format('{0}/{1}', env.REGISTRY, env.IMAGE_NAME) }}:${{ github.head_ref || github.ref_name }}
-            type=registry,ref=${{ format('{0}/{1}', env.REGISTRY, env.IMAGE_NAME) }}:cache-${{ matrix.codename }}
+            type=registry,ref=${{ env.REGISTRY_IMAGE }}:${{ github.head_ref || github.ref_name }}
+            type=registry,ref=${{ env.REGISTRY_IMAGE }}:cache-${{ matrix.codename }}
           # cache exporter doesn't work with docker driver
           cache-to: |
-            type=registry,ref=${{ format('{0}/{1}', env.REGISTRY, env.IMAGE_NAME) }}:cache-${{ matrix.codename }},mode=max
+            type=registry,ref=${{ env.REGISTRY_IMAGE }}:cache-${{ matrix.codename }},mode=max
           # this will give us some usefull information about the build
           provenance: mode=max
-          # for PRs the sbom will get built in Docker Scout
+          # for PRs the SBOM will be built in Docker Scout
           sbom: ${{ github.event_name != 'pull_request' }}
           # dependend on the event type, we either push or load the image
           push: ${{ github.event_name != 'pull_request' }}
-          # load: ${{ github.event_name == 'pull_request' }}
-          # github-token for the repository context
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          outputs: type=oci,dest=/tmp/image.tar
+        env:
+          REGISTRY_IMAGE: ${{ format('{0}/{1}', env.REGISTRY, env.IMAGE_NAME) }}
 
       # vulnerability scanning to verify PRs
       - name: Docker Scout
@@ -144,6 +146,8 @@ jobs:
         continue-on-error: true
         uses: docker/scout-action@v0.23.4
         with:
+          image: /tmp/image.tar
+          type: oci-dir
           command: quickview,compare,sbom
           to: ${{ format('{0}/{1}:{2}-{3}', env.REGISTRY, env.IMAGE_NAME, matrix.from-version, github.event.repository.default_branch) }}
           organization: ${{ env.DOCKERHUB_USERNAME }}
