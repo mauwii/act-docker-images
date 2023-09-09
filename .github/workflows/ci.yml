@@ -11,13 +11,6 @@ on:
       - '**/toolsets/*.json'
       - '**/.github/workflows/ci.yml'
 
-env:
-  REGISTRY: docker.io
-  IMAGE_NAME: ${{ format('{0}/{1}', github.repository_owner, 'ubuntu-act') }}
-  SHA: ${{ github.event.pull_request.head.sha || github.event.after }}
-  DOCKERHUB_USERNAME: ${{ github.repository_owner }}
-  DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
-
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -40,6 +33,13 @@ jobs:
       contents: read
       packages: write
       pull-requests: write
+    env:
+      REGISTRY: docker.io
+      IMAGE_NAME: ${{ format('{0}-{1}', matrix.distro, matrix.from-flavor) }}
+      IMAGE_REPOSITORY: ${{ format('{0}/{1}', github.repository_owner, format('{0}-{1}', matrix.distro, matrix.from-flavor)) }}
+      SHA: ${{ github.event.pull_request.head.sha || github.event.after }}
+      DOCKERHUB_USERNAME: ${{ github.repository_owner }}
+      DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
     steps:
       - name: Checkout
         uses: actions/checkout@v3.6.0
@@ -80,7 +80,7 @@ jobs:
         uses: docker/metadata-action@v4.4.0
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          images: ${{ format('{0}/{1}', env.REGISTRY, env.IMAGE_NAME) }}
+          images: ${{ format('{0}/{1}', env.REGISTRY, env.IMAGE_REPOSITORY) }}
           tags: |
             type=raw,value=${{ matrix.from-version }},enable={{is_default_branch}},priority=900
             type=raw,value=latest,enable=${{ github.ref == format('refs/heads/{0}', 'main') && matrix.from-version == '22.04' }},priority=700
@@ -92,7 +92,7 @@ jobs:
             org.opencontainers.image.description=${{ env.DESCRIPTION }}
             org.opencontainers.image.documentation=${{ env.REPOSITORY_LINK }}
             org.opencontainers.image.source=${{ env.SOURCE }}
-            org.opencontainers.image.title=${{ env.IMAGE_NAME }}:${{ github.head_ref || github.ref_name }}
+            org.opencontainers.image.title=${{ env.IMAGE_REPOSITORY }}:${{ github.head_ref || github.ref_name }}
             org.opencontainers.image.url=${{ env.REPOSITORY_LINK }}/blob/${{ env.SHA }}/linux/${{ matrix.distro }}/Dockerfile
             org.opencontainers.image.vendor=${{ github.repository_owner }}
         env:
@@ -134,9 +134,9 @@ jobs:
           # sbom: ${{ github.event_name != 'pull_request' }}
           # dependend on the event type, we either push or load the image
           push: ${{ github.event_name != 'pull_request' }}
-          outputs: type=image,name=${{ env.IMAGE_NAME }}:${{ env.SHA }},push=false
+          outputs: type=image,name=${{ env.IMAGE_REPOSITORY }}:${{ env.SHA }},push=false
         env:
-          REGISTRY_IMAGE: ${{ format('{0}/{1}', env.REGISTRY, env.IMAGE_NAME) }}
+          REGISTRY_IMAGE: ${{ format('{0}/{1}', env.REGISTRY, env.IMAGE_REPOSITORY) }}
 
       # vulnerability scanning to verify PRs
       - name: Docker Scout
@@ -146,7 +146,8 @@ jobs:
         uses: docker/scout-action@v0.23.4
         with:
           command: compare,recommendations
-          to: ${{ format('{0}/{1}:{2}', env.REGISTRY, env.IMAGE_NAME, matrix.from-version) }}
+          image: ${{ format('{0}:{1}', env.IMAGE_NAME, env.SHA) }}
+          to: ${{ format('{0}/{1}:{2}', env.REGISTRY, env.IMAGE_REPOSITORY, matrix.from-version) }}
           organization: ${{ github.repository_owner }}
           ignore-unchanged: true
           only-severities: critical,high
