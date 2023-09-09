@@ -132,7 +132,8 @@ jobs:
           # this will give us some usefull information about the build
           provenance: mode=max
           # for PRs the SBOM will be built in Docker Scout
-          sbom: ${{ github.event_name != 'pull_request' }}
+          sbom: true
+          # sbom: ${{ github.event_name != 'pull_request' }}
           # dependend on the event type, we either push or load the image
           push: ${{ github.event_name != 'pull_request' }}
           outputs: type=image,name=${{ steps.meta.outputs.tags }}
