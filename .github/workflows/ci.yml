@@ -115,7 +115,7 @@ jobs:
           tags: |
             ${{ steps.meta.outputs.tags }}
             ${{ env.IMAGE_REPOSITORY }}:${{ github.head_ref || github.ref_name }}
-            ${{ format('{0}:{1}', env.IMAGE_NAME, github.head_ref || github.ref_name, )}}
+            ${{ format('{0}:{1}', env.IMAGE_NAME, github.head_ref || github.ref_name)}}
           build-args: |
             FROM_IMAGE=buildpack-deps
             FROM_VERSION_MAJOR=${{ matrix.from-version-major }}
