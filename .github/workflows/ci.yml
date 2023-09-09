@@ -132,11 +132,11 @@ jobs:
           # this will give us some usefull information about the build
           provenance: mode=max
           # for PRs the SBOM will be built in Docker Scout
-          sbom: true
+          sbom: ${{ github.event_name != 'pull_request' }}
           # sbom: ${{ github.event_name != 'pull_request' }}
           # dependend on the event type, we either push or load the image
           push: ${{ github.event_name != 'pull_request' }}
-          outputs: type=image,name=${{ steps.meta.outputs.tags }}
+          outputs: type=tar,dest=/tmp/${{ env.SHA }}.tar
         env:
           REGISTRY_IMAGE: ${{ format('{0}/{1}', env.REGISTRY, env.IMAGE_NAME) }}
 
@@ -147,7 +147,8 @@ jobs:
         continue-on-error: true
         uses: docker/scout-action@v0.23.4
         with:
-          image: ${{ steps.meta.outputs.tags }}
+          image: /tmp/${{ env.SHA }}.tar
+          type: archive
           command: compare,sbom
           to: ${{ format('{0}/{1}:{2}-{3}', env.REGISTRY, env.IMAGE_NAME, matrix.from-version, github.event.repository.default_branch) }}
           ignore-unchanged: true
