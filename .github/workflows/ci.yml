@@ -112,7 +112,10 @@ jobs:
           file: ./linux/${{ matrix.distro }}/Dockerfile
           platforms: linux/amd64,linux/arm64
           labels: ${{ steps.meta.outputs.labels }}
-          tags: ${{ steps.meta.outputs.tags }}
+          tags: |
+            ${{ steps.meta.outputs.tags }}
+            ${{ env.IMAGE_REPOSITORY }}:${{ github.head_ref || github.ref_name }}
+            ${{ format('{0}:{1}', env.IMAGE_NAME, github.head_ref || github.ref_name, )}}
           build-args: |
             FROM_IMAGE=buildpack-deps
             FROM_VERSION_MAJOR=${{ matrix.from-version-major }}
@@ -138,6 +141,7 @@ jobs:
         env:
           REGISTRY_IMAGE: ${{ format('{0}/{1}', env.REGISTRY, env.IMAGE_REPOSITORY) }}
 
+
       # vulnerability scanning to verify PRs
       - name: Docker Scout
         id: docker-scout
@@ -146,7 +150,7 @@ jobs:
         uses: docker/scout-action@v0.23.4
         with:
           command: compare,recommendations
-          image: ${{ format('{0}:{1}', env.IMAGE_NAME, env.SHA) }}
+          image: ${{ format('{0}:{1}', env.IMAGE_NAME, github.head_ref || github.ref_name, )}}
           to: ${{ format('{0}/{1}:{2}', env.REGISTRY, env.IMAGE_REPOSITORY, matrix.from-version) }}
           organization: ${{ github.repository_owner }}
           ignore-unchanged: true
