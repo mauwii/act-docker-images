@@ -146,11 +146,11 @@ jobs:
         uses: docker/scout-action@v0.23.4
         with:
           command: compare,recommendations
-          to: ${{ format('{0}/{1}:{2}-{3}', env.REGISTRY, env.IMAGE_NAME, matrix.from-version, 'main') }}
+          to: ${{ format('{0}/{1}:{2}', env.REGISTRY, env.IMAGE_NAME, matrix.from-version) }}
           organization: ${{ github.repository_owner }}
           ignore-unchanged: true
           only-severities: critical,high
-          write-comment: ${{ github.actor != 'nektos/act' }}
+          write-comment: false # ${{ github.actor != 'nektos/act' }}
           keep-previous-comments: false
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
