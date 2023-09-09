@@ -1,10 +1,15 @@
+# yaml-language-server: $schema=https://json.schemastore.org/prettierrc.json
+
 editorconfig: true
 singleQuote: true
+
 overrides:
-  - files:
-      - '*.md'
+  - files: '*.md'
     options:
       printWidth: 100
       proseWrap: always
       singleQuote: false
       tabWidth: 2
+  - files: '.prettierrc.yaml'
+    options:
+      parser: yaml
