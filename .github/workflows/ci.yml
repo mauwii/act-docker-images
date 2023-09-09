@@ -82,7 +82,7 @@ jobs:
         uses: docker/metadata-action@v4.4.0
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          images: ${{ env.IMAGE_NAME }} # ${{ format('{0}/{1}', env.REGISTRY, env.IMAGE_NAME) }}
+          images: ${{ format('{0}/{1}', env.REGISTRY, env.IMAGE_NAME) }}
           tags: |
             type=raw,value=${{ matrix.from-version }},enable={{is_default_branch}},priority=900
             type=raw,value=latest,enable=${{ github.ref == format('refs/heads/{0}', 'main') && matrix.from-version == '22.04' }},priority=700
