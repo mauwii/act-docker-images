@@ -45,19 +45,23 @@ The easiest way is to add those lines in your `~/.actrc`:
 For further Informations about nektos/arc and how to use it, checkout the
 [nektos documentation📖](https://nektosact.com/beginner/index.html)
 
-## How I run act on my M2-Max
+## How I run act on my M2-Max 💻
 
 - didnt work properly when installed via brew, so I installed it via GitHub-CLI:
 
-  `gh extension install https://github.com/nektos/gh-act`
+  ```bash
+  gh extension install https://github.com/nektos/gh-act
+  ```
 
 - set an alias:
 
-  `alias act='gh act -s GITHUB_TOKEN="$(gh auth token)"'`
+  ```bash
+  alias act='gh act -s GITHUB_TOKEN="$(gh auth token)"'
+  ```
 
 - export DOCKER_HOST env
 
-  ```sh
+  ```bash
   DOCKER_HOST=$(docker context inspect --format '{{.Endpoints.docker.Host}}')
   export DOCKER_HOST
   ```
@@ -66,11 +70,11 @@ For further Informations about nektos/arc and how to use it, checkout the
 
   - Advanced:
 
-    :heavy_check_mark: Allow the default Docker socket to be used (requires password)
+    ✔️ Allow the default Docker socket to be used (requires password)
 
   - Features in Development:
 
-    All Beta Features enabled (containerd, wasm, rosetta and builds view)
+    ✔️ All Beta Features enabled (containerd, wasm, rosetta and builds view)
 
 - `~/.actrc`:
 
@@ -85,8 +89,9 @@ For further Informations about nektos/arc and how to use it, checkout the
 
 To execute the mega-linter locally:
 
-```sh
+```bash
 npx mega-linter-runner \
-    -e GITHUB_TOKEN=$(gh auth token) \
+    --flavor salesforce \
+    -e GITHUB_TOKEN="$(gh auth token)" \
     --remove-container
 ```

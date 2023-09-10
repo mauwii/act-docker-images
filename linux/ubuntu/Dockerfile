@@ -49,14 +49,13 @@ RUN sed 's|"||g' -i "/etc/environment" \
 
 # add ssh keys of github and azure devops
 # hadolint ignore=SC2174
-RUN mkdir -m 0700 -p ~/.ssh \
-    && ssh-keyscan -t rsa github.com >>/etc/ssh/ssh_known_hosts \
-    && ssh-keyscan -t rsa ssh.dev.azure.com >>/etc/ssh/ssh_known_hosts
+RUN ssh-keyscan github.com >>/etc/ssh/ssh_known_hosts \
+    && ssh-keyscan ssh.dev.azure.com >>/etc/ssh/ssh_known_hosts
 
 # Install dependencies
-RUN apt-get -yq update \
+RUN apt-get -y update \
     && packages=(gawk sudo jq gnupg-agent ca-certificates software-properties-common apt-transport-https zstd zip unzip xz-utils) \
-    && apt-get -yq install --no-install-recommends --no-install-suggests \
+    && apt-get -y install --no-install-recommends --no-install-suggests \
         "${packages[@]}" \
     && apt-get clean \
     && rm -rf /etc/apt/sources.list.d/* \
@@ -68,9 +67,17 @@ RUN bash -c "$(curl -fsSL https://raw.githubusercontent.com/ilikenwf/apt-fast/ma
     && rm -rf /etc/apt/sources.list.d/* \
     && rm -rf /var/lib/apt/lists/*
 
+# Install current version of git
+RUN add-apt-repository -y ppa:git-core/ppa \
+    && apt-get -y update \
+    && apt-get -y install --no-install-recommends git \
+    && apt-get clean \
+    && rm -rf /etc/apt/sources.list.d/* \
+    && rm -rf /var/lib/apt/lists/*
+
 # Install Git-LFS
 RUN curl -Ls https://packagecloud.io/install/repositories/github/git-lfs/script.deb.sh | bash \
-    && apt-get -yq install --no-install-recommends --no-install-suggests \
+    && apt-get -y install --no-install-recommends --no-install-suggests \
         git-lfs \
     && apt-get clean \
     && rm -rf /etc/apt/sources.list.d/* \
@@ -81,8 +88,8 @@ RUN echo "deb https://packages.microsoft.com/ubuntu/$(lsb_release -rs)/prod $(ls
     | tee /etc/apt/sources.list.d/microsoft-prod.list \
     && curl -sL https://packages.microsoft.com/keys/microsoft.asc \
     | gpg --dearmor >/etc/apt/trusted.gpg.d/microsoft.gpg \
-    && apt-get -yq update \
-    && apt-get -yq install --no-install-recommends --no-install-suggests \
+    && apt-get -y update \
+    && apt-get -y install --no-install-recommends --no-install-suggests \
         moby-cli \
         moby-buildx \
         moby-compose \
@@ -108,8 +115,8 @@ RUN export fromVersion=${FROM_VERSION} \
     && deps=("libc6" "libgcc1" "libgssapi-krb5-2" "libstdc++6" "zlib1g") \
     && if [ "${fromVersion}" = "20.04" ]; then deps+=("libicu66" "libssl1.1"); fi \
     && if [ "${fromVersion}" = "22.04" ]; then deps+=("libicu70" "libssl3" "libunwind8"); fi \
-    && apt-get -yq update \
-    && apt-get -yq install --no-install-recommends \
+    && apt-get -y update \
+    && apt-get -y install --no-install-recommends \
         "${deps[@]}" \
     && curl -L https://dot.net/v1/dotnet-install.sh -o dotnet-install.sh \
     && chmod +x ./dotnet-install.sh \
@@ -148,8 +155,8 @@ RUN curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
     && chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg \
     && echo "deb [arch=${TARGETARCH} signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" \
     | tee /etc/apt/sources.list.d/github-cli.list >/dev/null \
-    && apt-get -yq update \
-    && apt-get -yq install --no-install-recommends \
+    && apt-get -y update \
+    && apt-get -y install --no-install-recommends \
         gh \
     && apt-get clean \
     && rm -rf /etc/apt/sources.list.d/* \
@@ -160,8 +167,8 @@ RUN [[ $(curl -sL https://packages.microsoft.com/repos/azure-cli/dists/) =~ $(ls
     && (curl -sL https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor >/etc/apt/trusted.gpg.d/microsoft.gpg \
         && echo "deb [arch=$(dpkg --print-architecture)] https://packages.microsoft.com/repos/azure-cli/ $(lsb_release -cs) main" \
             >/etc/apt/sources.list.d/azure-cli.list \
-        && apt-get -yq update \
-        && apt-get -yq install --no-install-recommends \
+        && apt-get -y update \
+        && apt-get -y install --no-install-recommends \
             azure-cli \
         && az extension add -n azure-devops \
         && az bicep install --target-platform "linux-$(cat /tmp/targetproc)" \
@@ -185,10 +192,10 @@ COPY linux/${DISTRO}/toolsets/${FROM_VERSION_MAJOR}${FROM_VERSION_MINOR}.json ${
 
 # install apt packages from toolset
 # hadolint ignore=SC2207
-RUN apt-get -yq update \
+RUN apt-get -y update \
     && packages=() \
     && while IFS='' read -r line; do packages+=("${line}"); done < <(jq -r '.apt|.vital_packages[],.common_packages[],.cmd_packages[]' ${TOOLSET}) \
-    && apt-get -yq install --no-install-recommends --no-upgrade \
+    && apt-get -y install --no-install-recommends --no-upgrade \
         "${packages[@]}" \
     && apt-get clean \
     && rm -rf /etc/apt/sources.list.d/* \
@@ -211,7 +218,7 @@ RUN pwsh -NonInteractive -Command "Set-PSRepository -Name PSGallery -Installatio
     && while IFS='' read -r azVersion; do echo "installing Az ${azVersion}" && pwsh -NonInteractive -Command "Install-Module -Name Az -RequiredVersion ${azVersion} -Scope AllUsers -Repository PSGallery"; done < <(jq -r '.azureModules[].versions[]' ${TOOLSET})
 
 # cleanup step
-RUN apt-get -yq clean \
+RUN apt-get -y clean \
     && rm -rf \
         /var/cache/* \
         /var/log/* \
