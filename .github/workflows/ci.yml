@@ -133,7 +133,7 @@ jobs:
           sbom: ${{ github.event_name != 'pull_request' }}
           # depended on the event type, we either push or load the image
           push: ${{ github.event_name != 'pull_request' }}
-          outputs: type=image,name=${{ env.IMAGE_REPOSITORY }}:${{ env.SHA }},push=false
+          outputs: type=image,name=${{ env.REGISTRY_IMAGE }}:${{ env.SHA }},push=false
         env:
           REGISTRY_IMAGE: ${{ format('{0}/{1}', env.REGISTRY, env.IMAGE_REPOSITORY) }}
 
