@@ -52,14 +52,6 @@ RUN sed 's|"||g' -i "/etc/environment" \
 RUN ssh-keyscan github.com >>/etc/ssh/ssh_known_hosts \
     && ssh-keyscan ssh.dev.azure.com >>/etc/ssh/ssh_known_hosts
 
-# Install current version of git
-RUN add-apt-repository -y ppa:git-core/ppa \
-    && apt-get -y update \
-    && apt-get -y install --no-install-recommends git \
-    && apt-get clean \
-    && rm -rf /etc/apt/sources.list.d/* \
-    && rm -rf /var/lib/apt/lists/*
-
 # Install dependencies
 RUN apt-get -y update \
     && packages=(gawk sudo jq gnupg-agent ca-certificates software-properties-common apt-transport-https zstd zip unzip xz-utils) \
@@ -71,6 +63,14 @@ RUN apt-get -y update \
 
 # Install apt-fast
 RUN bash -c "$(curl -fsSL https://raw.githubusercontent.com/ilikenwf/apt-fast/master/quick-install.sh)" \
+    && apt-get clean \
+    && rm -rf /etc/apt/sources.list.d/* \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install current version of git
+RUN add-apt-repository -y ppa:git-core/ppa \
+    && apt-get -y update \
+    && apt-get -y install --no-install-recommends git \
     && apt-get clean \
     && rm -rf /etc/apt/sources.list.d/* \
     && rm -rf /var/lib/apt/lists/*
