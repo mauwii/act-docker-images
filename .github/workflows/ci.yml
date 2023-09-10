@@ -90,16 +90,15 @@ jobs:
           labels: |
             org.opencontainers.image.authors=['${{ env.REPOSITORY_LINK }}','${{ github.actor }}']
             org.opencontainers.image.created={{date 'dddd, MMMM Do YYYY, h:mm:ss a'}}
-            org.opencontainers.image.description=${{ env.DESCRIPTION }}
+            org.opencontainers.image.description=${{ github.event.repository.description }}
             org.opencontainers.image.documentation=${{ env.REPOSITORY_LINK }}
-            org.opencontainers.image.source=${{ env.SOURCE }}
+            org.opencontainers.image.revision=${{ env.SHA }}
+            org.opencontainers.image.source=${{ github.repositoryUrl }}
             org.opencontainers.image.title=${{ env.IMAGE_REPOSITORY }}:${{ github.head_ref || github.ref_name }}
             org.opencontainers.image.url=${{ env.REPOSITORY_LINK }}/blob/${{ env.SHA }}/linux/${{ matrix.distro }}/Dockerfile
             org.opencontainers.image.vendor=${{ github.repository_owner }}
         env:
           REPOSITORY_LINK: https://github.com/${{ github.repository }}
-          DESCRIPTION: ${{ github.event.repository.description }}
-          SOURCE: ${{ github.repositoryUrl }}
 
       # Build and push Docker image with Buildx (don't push on PR)
       # https://github.com/docker/build-push-action
@@ -146,6 +145,7 @@ jobs:
         uses: docker/scout-action@v0.23.4
         with:
           command: recommendations,compare
+          image: ${{ steps.meta.outputs.tags }}
           to: ${{ format('{0}/{1}:{2}', env.REGISTRY, env.IMAGE_REPOSITORY, matrix.from-version) }}
           organization: ${{ github.repository_owner }}
           ignore-unchanged: true
