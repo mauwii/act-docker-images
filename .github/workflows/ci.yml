@@ -123,7 +123,7 @@ jobs:
             CODENAME=${{ matrix.codename }}
           # caching to speed up the build
           cache-from: |
-            type=registry,ref=${{ env.REGISTRY_IMAGE }}:${{ github.head_ref || github.ref_name }}
+            type=registry,ref=${{ env.REGISTRY_IMAGE }}:${{ matrix.from-version }}-${{ github.head_ref || github.ref_name }}
             type=registry,ref=${{ env.REGISTRY_IMAGE }}:cache-${{ matrix.codename }}
           # cache exporter doesn't work with docker driver
           cache-to: |
@@ -132,7 +132,6 @@ jobs:
           provenance: mode=max
           # for PRs the SBOM will be built in Docker Scout
           sbom: ${{ github.event_name != 'pull_request' }}
-          # sbom: ${{ github.event_name != 'pull_request' }}
           # depended on the event type, we either push or load the image
           push: ${{ github.event_name != 'pull_request' }}
           outputs: type=image,name=${{ env.IMAGE_REPOSITORY }}:${{ env.SHA }},push=false
@@ -140,35 +139,20 @@ jobs:
           REGISTRY_IMAGE: ${{ format('{0}/{1}', env.REGISTRY, env.IMAGE_REPOSITORY) }}
 
       # vulnerability scanning to verify PRs
-      - name: Docker Scout recommendations
-        id: docker-scout-recommendations
-        if: success()
+      - name: Docker Scout
+        id: docker-scout
+        if: success() && github.event_name == 'pull_request'
         continue-on-error: true
         uses: docker/scout-action@v0.23.4
         with:
-          command: recommendations
+          command: recommendations,compare
           to: ${{ format('{0}/{1}:{2}', env.REGISTRY, env.IMAGE_REPOSITORY, matrix.from-version) }}
           organization: ${{ github.repository_owner }}
           ignore-unchanged: true
-          only-severities: critical,high
-          write-comment: ${{ github.actor != 'nektos/act' && github.event_name == 'pull_request' }}
-          keep-previous-comments: false
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-
-      # vulnerability scanning to verify PRs
-      - name: Docker Scout compare
-        id: docker-scout-compare
-        if: success()
-        continue-on-error: true
-        uses: docker/scout-action@v0.23.4
-        with:
-          command: compare
-          to: ${{ format('{0}/{1}:{2}', env.REGISTRY, env.IMAGE_REPOSITORY, matrix.from-version) }}
-          organization: ${{ github.repository_owner }}
-          ignore-unchanged: true
-          only-severities: critical,high
-          write-comment: ${{ github.actor != 'nektos/act' && github.event_name == 'pull_request' }}
-          keep-previous-comments: false
+          only-severities: high
+          write-comment: ${{ github.actor != 'nektos/act' }}
+          keep-previous-comments: true
+          summary: ${{ github.actor != 'nektos/act' }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
   # ToDo: Move into a separate workflow and depend on ci and mega-linter
