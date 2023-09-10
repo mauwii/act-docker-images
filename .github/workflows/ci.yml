@@ -42,10 +42,7 @@ jobs:
       DOCKERHUB_USERNAME: ${{ github.repository_owner }}
       DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
     steps:
-      - name: Checkout
-        uses: actions/checkout@v3.6.0
-        with:
-          ref: ${{ env.SHA }}
+      - uses: actions/checkout@v3.6.0
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v2
@@ -85,12 +82,12 @@ jobs:
           tags: |
             type=raw,value=${{ matrix.from-version }},enable={{is_default_branch}},priority=900
             type=raw,value=${{ matrix.from-version }}-${{ github.head_ref || github.ref_name }},priority=600
-            type=sha,prefix=${{ matrix.from-version }}-,format=short,priority=100
-          flavor:
+            type=sha,prefix=${{ matrix.from-version }}-,format=short,enable={{is_default_branch}},priority=100
+          flavor: |
             latest=${{ github.ref == format('refs/heads/{0}', 'main') && matrix.from-version == '22.04' }}
+
           labels: |
             org.opencontainers.image.authors=['${{ env.REPOSITORY_LINK }}','${{ github.actor }}']
-            org.opencontainers.image.created={{date 'dddd, MMMM Do YYYY, h:mm:ss a'}}
             org.opencontainers.image.description=${{ github.event.repository.description }}
             org.opencontainers.image.documentation=${{ env.REPOSITORY_LINK }}
             org.opencontainers.image.revision=${{ env.SHA }}
@@ -131,9 +128,9 @@ jobs:
           # this will give us some useful information about the build
           provenance: mode=max
           # for PRs the SBOM will be built in Docker Scout
-          sbom: ${{ github.event_name != 'pull_request' }}
+          sbom: true
           # depended on the event type, we either push or load the image
-          push: ${{ github.event_name != 'pull_request' }}
+          push: true
           # outputs: type=image,name=${{ env.REGISTRY_IMAGE }}:${{ matrix.from-version }}-${{ github.head_ref || github.ref_name }},push=true
         env:
           REGISTRY_IMAGE: ${{ format('{0}/{1}', env.REGISTRY, env.IMAGE_REPOSITORY) }}
