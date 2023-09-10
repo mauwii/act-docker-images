@@ -13,3 +13,4 @@ FILEIO_REPORTER: false
 FILTER_REGEX_EXCLUDE: '(tmp/|\\.example|megalinter-reports)'
 YAML_V8R_FILTER_REGEX_EXCLUDE: '(\.prettierrc\.yaml)'
 VALIDATE_ALL_CODEBASE: true
+SPELL_LYCHEE_FILTER_REGEX_EXCLUDE: '(.github/workflows|\.mega-linter\.yml)'
