@@ -1,0 +1,42 @@
+# yaml-language-server: $schema=https://json.schemastore.org/github-action.json
+
+name: Free some disk space
+author: mauwii
+description: |
+  This Action can be used to free up some disk-space on
+  github hosted runners
+
+inputs:
+  deleteDotnet:
+    description: free ~20 GB bei removing pre-cached .NET
+    required: false
+    default: 'false'
+  deleteAndroid:
+    description: free ~10 GB bei removing pre-cached Android SDK
+    required: false
+    default: 'false'
+
+runs:
+  using: 'composite'
+  steps:
+    # will release about 20GB if you don't need .NET
+    - name: Remove .NET
+      id: dotnet
+      if: fromJson(inputs.deleteDotnet)
+      shell: bash
+      run: |
+        for dir in /usr/share/dotnet /opt/hostedtoolcache/dotnet; do
+          if [ -d $dir ]; then
+            sudo rm -Rf $dir # Ubuntu 18/20
+          fi
+        done
+
+    # will release about 10 GB if you don't need Android
+    - name: Remove android sdk
+      id: android
+      if: fromJson(inputs.deleteAndroid)
+      shell: bash
+      run: |
+        if [ -d /usr/local/lib/android ]; then
+          sudo rm -rf /usr/local/lib/android
+        fi

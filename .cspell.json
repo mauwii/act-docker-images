@@ -112,5 +112,6 @@
     "xvfb",
     "zstd",
     "zsync"
-  ]
+  ],
+  "enableFiletypes": ["github-actions-workflow"]
 }
