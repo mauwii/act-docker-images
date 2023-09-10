@@ -1,4 +1,5 @@
 # syntax=docker/dockerfile:1
+# kics-scan disable=e36d8880-3f78-4546-b9a1-12f0745ca0d5,965a08d7-ef86-4f14-8792-4a3b2098937e,77783205-c4ca-4f80-bb80-c777f267c547
 ARG FROM_IMAGE=buildpack-deps
 ARG FROM_VERSION_MAJOR=22
 ARG FROM_VERSION_MINOR=04

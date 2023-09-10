@@ -11,6 +11,7 @@
   "words": [
     "ASPNET",
     "BASEPATH",
+    "CODEOWNERS",
     "MARKDOWNLINT",
     "NOLOGO",
     "ONBUILD",
@@ -100,6 +101,8 @@
     "stefanzweifel",
     "targetproc",
     "texinfo",
+    "trivy",
+    "trivyignore",
     "toolcache",
     "toolsets",
     "tzdata",
