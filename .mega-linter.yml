@@ -10,7 +10,7 @@ APPLY_FIXES: all # all, none, or list of linter keys
 SHOW_ELAPSED_TIME: true
 FILEIO_REPORTER: false
 # DISABLE_ERRORS: true # Uncomment if you want MegaLinter to detect errors but not block CI to pass
-FILTER_REGEX_EXCLUDE: '(tmp/|\\.example|megalinter-reports)'
+FILTER_REGEX_EXCLUDE: '(megalinter-reports/)'
 YAML_V8R_FILTER_REGEX_EXCLUDE: '(\.prettierrc\.yaml)'
 VALIDATE_ALL_CODEBASE: true
 SPELL_LYCHEE_FILTER_REGEX_EXCLUDE: '(.github/workflows|\.mega-linter\.yml)'

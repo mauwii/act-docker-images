@@ -42,7 +42,7 @@ jobs:
       DOCKERHUB_USERNAME: ${{ github.repository_owner }}
       DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
     steps:
-      - uses: actions/checkout@v3.6.0
+      - uses: actions/checkout@v4
 
       - name: Free up disk space
         uses: ./.github/actions/free-space
@@ -132,9 +132,6 @@ jobs:
             type=registry,ref=${{ env.REGISTRY_IMAGE }}:cache-${{ matrix.codename }},mode=max
           # this will give us some useful information about the build
           provenance: mode=max
-          # for PRs the SBOM will be built in Docker Scout
-          # sbom: true
-          # depended on the event type, we either push or load the image
           push: true
           # outputs: type=image,name=${{ env.REGISTRY_IMAGE }}:${{ matrix.from-version }}-${{ github.head_ref || github.ref_name }},push=true
         env:
@@ -146,12 +143,12 @@ jobs:
         continue-on-error: true
         uses: docker/scout-action@v0.23.4
         with:
-          command: recommendations,sbom,compare
+          command: sbom,compare
           image: ${{ steps.meta.outputs.tags }}
           to: ${{ format('{0}/{1}:{2}', env.REGISTRY, env.IMAGE_REPOSITORY, matrix.from-version) }}
           organization: ${{ github.repository_owner }}
           ignore-unchanged: true
-          only-severities: high
+          only-severities: critical
           write-comment: ${{ github.actor != 'nektos/act' }}
           keep-previous-comments: true
           summary: ${{ github.actor != 'nektos/act' }}

@@ -22,7 +22,7 @@ concurrency:
 permissions:
   # Give the default GITHUB_TOKEN write permission to commit and push, comment issues & post new PR
   # Remove the ones you do not need
-  contents: write
+  contents: read
   issues: write
   pull-requests: write
 
@@ -30,6 +30,8 @@ jobs:
   build:
     name: MegaLinter
     runs-on: ubuntu-latest
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
       # Git Checkout
       - name: Checkout Code
