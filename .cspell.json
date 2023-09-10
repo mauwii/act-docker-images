@@ -54,6 +54,7 @@
     "imagetools",
     "iputils",
     "keyscan",
+    "kics",
     "libc",
     "libcurl",
     "libgbm",
