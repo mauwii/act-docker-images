@@ -42,12 +42,12 @@ jobs:
       DOCKERHUB_USERNAME: ${{ github.repository_owner }}
       DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
     steps:
+      - uses: actions/checkout@v3.6.0
+
       - uses: ./.github/actions/free-space
         with:
           deleteDotnet: 'true'
           deleteAndroid: 'true'
-
-      - uses: actions/checkout@v3.6.0
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v2
