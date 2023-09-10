@@ -1,9 +1,10 @@
 # syntax=docker/dockerfile:1
+# kics-scan disable=e36d8880-3f78-4546-b9a1-12f0745ca0d5,965a08d7-ef86-4f14-8792-4a3b2098937e,77783205-c4ca-4f80-bb80-c777f267c547
 ARG FROM_IMAGE=buildpack-deps
 ARG FROM_VERSION_MAJOR=22
 ARG FROM_VERSION_MINOR=04
 ARG FROM_VERSION=${FROM_VERSION_MAJOR}.${FROM_VERSION_MINOR}
-FROM --platform=$TARGETPLATFORM ${FROM_IMAGE}:${FROM_VERSION}
+FROM ${FROM_IMAGE}:${FROM_VERSION}
 
 # automatic buildx ARGs
 ARG TARGETARCH
@@ -194,7 +195,7 @@ RUN apt-get -yq update \
     && rm -rf /var/lib/apt/lists/*
 
 # Install default NodeJS and toolset node_modules
-# hadolint ignore=SC2174,DL3016
+# hadolint ignore=SC2174
 RUN curl -fsSL https://raw.githubusercontent.com/tj/n/master/bin/n -o ~/n \
     && defaultVersion=$(jq -r '.node.default' ${TOOLSET}) \
     && bash ~/n "${defaultVersion}" \
@@ -205,17 +206,9 @@ RUN curl -fsSL https://raw.githubusercontent.com/tj/n/master/bin/n -o ~/n \
     && rm -rf ~/n
 
 # Trust PSGallery and install Powershell-/Azure Modules
-RUN <<EOF
-pwsh -NonInteractive -Command "Set-PSRepository -Name PSGallery -InstallationPolicy Trusted"
-while IFS='' read -r pwshModule; do
-    echo "installing ${pwshModule}"
-    pwsh -NonInteractive -Command "Install-Module -Name ${pwshModule} -Scope AllUsers -Repository PSGallery"
-done < <(jq -r '.powershellModules[].name' ${TOOLSET})
-while IFS='' read -r azVersion; do
-    echo "installing Az ${azVersion}"
-    pwsh -NonInteractive -Command "Install-Module -Name Az -RequiredVersion ${azVersion} -Scope AllUsers -Repository PSGallery"
-done < <(jq -r '.azureModules[].versions[]' ${TOOLSET})
-EOF
+RUN pwsh -NonInteractive -Command "Set-PSRepository -Name PSGallery -InstallationPolicy Trusted" \
+    && while IFS='' read -r pwshModule; do echo "installing ${pwshModule}" && pwsh -NonInteractive -Command "Install-Module -Name ${pwshModule} -Scope AllUsers -Repository PSGallery"; done < <(jq -r '.powershellModules[].name' ${TOOLSET}) \
+    && while IFS='' read -r azVersion; do echo "installing Az ${azVersion}" && pwsh -NonInteractive -Command "Install-Module -Name Az -RequiredVersion ${azVersion} -Scope AllUsers -Repository PSGallery"; done < <(jq -r '.azureModules[].versions[]' ${TOOLSET})
 
 # cleanup step
 RUN apt-get -yq clean \
@@ -228,3 +221,6 @@ RUN apt-get -yq clean \
 
 ARG RUNNER
 USER ${RUNNER}
+
+# No idea how to do a healthcheck for this image
+HEALTHCHECK NONE

@@ -7,9 +7,12 @@ on:
       - README.md
       - .github/workflows/dockerhub-description.yml
 
+permissions:
+  contents: read
+
 jobs:
   dockerHubDescription:
-    name:
+    name: Update Docker-Hub description
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
