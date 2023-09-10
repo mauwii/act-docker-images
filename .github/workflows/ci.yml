@@ -84,9 +84,10 @@ jobs:
           images: ${{ format('{0}/{1}', env.REGISTRY, env.IMAGE_REPOSITORY) }}
           tags: |
             type=raw,value=${{ matrix.from-version }},enable={{is_default_branch}},priority=900
-            type=raw,value=latest,enable=${{ github.ref == format('refs/heads/{0}', 'main') && matrix.from-version == '22.04' }},priority=700
-            type=ref,event=branch,prefix=${{ matrix.from-version }}-,priority=600
+            type=raw,value=${{ matrix.from-version }}-${{ github.head_ref || github.ref_name }},priority=600
             type=sha,prefix=${{ matrix.from-version }}-,format=short,priority=100
+          flavor:
+            latest=${{ github.ref == format('refs/heads/{0}', 'main') && matrix.from-version == '22.04' }}
           labels: |
             org.opencontainers.image.authors=['${{ env.REPOSITORY_LINK }}','${{ github.actor }}']
             org.opencontainers.image.created={{date 'dddd, MMMM Do YYYY, h:mm:ss a'}}
@@ -133,7 +134,7 @@ jobs:
           sbom: ${{ github.event_name != 'pull_request' }}
           # depended on the event type, we either push or load the image
           push: ${{ github.event_name != 'pull_request' }}
-          outputs: type=image,name=${{ env.REGISTRY_IMAGE }}:${{ env.SHA }},push=false
+          # outputs: type=image,name=${{ env.REGISTRY_IMAGE }}:${{ matrix.from-version }}-${{ github.head_ref || github.ref_name }},push=true
         env:
           REGISTRY_IMAGE: ${{ format('{0}/{1}', env.REGISTRY, env.IMAGE_REPOSITORY) }}
 
