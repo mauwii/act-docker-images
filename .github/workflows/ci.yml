@@ -11,6 +11,11 @@ on:
       - '**/toolsets/*.json'
       - '**/.github/workflows/ci.yml'
 
+permissions:
+  contents: read
+  packages: write
+  pull-requests: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -29,10 +34,6 @@ jobs:
             distro: 'ubuntu'
             codename: 'focal'
             from-flavor: 'act'
-    permissions:
-      contents: read
-      packages: write
-      pull-requests: write
     env:
       REGISTRY: docker.io
       IMAGE_NAME: ${{ format('{0}-{1}', matrix.distro, matrix.from-flavor) }}
@@ -127,12 +128,12 @@ jobs:
           # cache exporter doesn't work with docker driver
           cache-to: |
             type=registry,ref=${{ env.REGISTRY_IMAGE }}:cache-${{ matrix.codename }},mode=max
-          # this will give us some usefull information about the build
+          # this will give us some useful information about the build
           provenance: mode=max
           # for PRs the SBOM will be built in Docker Scout
           sbom: ${{ github.event_name != 'pull_request' }}
           # sbom: ${{ github.event_name != 'pull_request' }}
-          # dependend on the event type, we either push or load the image
+          # depended on the event type, we either push or load the image
           push: ${{ github.event_name != 'pull_request' }}
           outputs: type=image,name=${{ env.IMAGE_REPOSITORY }}:${{ env.SHA }},push=false
         env:
