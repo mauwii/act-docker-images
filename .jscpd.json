@@ -10,6 +10,9 @@
     "**/.github/**",
     "**/.idea/**",
     "**/report/**",
-    "**/*.svg"
+    "**/*.svg",
+    "**/tmp/**",
+    "**/megalinter-reports/**",
+    "**/linux/*/toolsets/*.json"
   ]
 }

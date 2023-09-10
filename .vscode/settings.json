@@ -1,41 +1,37 @@
 {
-	"[dockerfile]": {
-		"editor.quickSuggestions": {
-			"strings": true
-		}
-	},
-	"[markdown]": {
-		"diffEditor.ignoreTrimWhitespace": false,
-		"editor.defaultFormatter": "esbenp.prettier-vscode",
-		"editor.quickSuggestions": {
-			"comments": "off",
-			"other": "off",
-			"strings": "off"
-		},
-		"editor.unicodeHighlight.ambiguousCharacters": false,
-		"editor.unicodeHighlight.invisibleCharacters": false,
-		"editor.wordWrap": "on"
-	},
-	"[yaml]": {
-		"diffEditor.ignoreTrimWhitespace": false,
-		"editor.autoIndent": "keep",
-		"editor.defaultFormatter": "redhat.vscode-yaml",
-		"editor.formatOnSave": true,
-		"editor.insertSpaces": true,
-		"editor.quickSuggestions": {
-			"comments": false,
-			"other": true,
-			"strings": true
-		},
-		"editor.tabSize": 2
-	},
-	"shellformat.flag": "--indent 4 --binary-next-line --case-indent",
-	"yaml.schemas": {
-		"https://json.schemastore.org/github-action.json": "**/.github/actions/**.yml",
-		"https://json.schemastore.org/prettierrc.json": "**/.hadolint.yaml"
-	},
-	"files.associations": {
-		"**/.github/actions/*.yml": "github-actions-workflow",
-		"**/.github/actions/*.yaml": "github-actions-workflow"
-	}
+  "[dockerfile]": {
+    "editor.quickSuggestions": {
+      "strings": true
+    }
+  },
+  "[markdown]": {
+    "diffEditor.ignoreTrimWhitespace": false,
+    "editor.defaultFormatter": "esbenp.prettier-vscode",
+    "editor.quickSuggestions": {
+      "comments": "off",
+      "other": "off",
+      "strings": "off"
+    },
+    "editor.unicodeHighlight.ambiguousCharacters": false,
+    "editor.unicodeHighlight.invisibleCharacters": false,
+    "editor.wordWrap": "on"
+  },
+  "[yaml]": {
+    "diffEditor.ignoreTrimWhitespace": false,
+    "editor.autoIndent": "keep",
+    "editor.defaultFormatter": "redhat.vscode-yaml",
+    "editor.formatOnSave": true,
+    "editor.insertSpaces": true,
+    "editor.quickSuggestions": {
+      "comments": false,
+      "other": true,
+      "strings": true
+    },
+    "editor.tabSize": 2
+  },
+  "shellformat.flag": "--indent 4 --binary-next-line --case-indent",
+  "yaml.schemas": {
+    "https://json.schemastore.org/github-action.json": "./.github/actions/**.yml",
+    "https://json.schemastore.org/prettierrc.json": "./.prettierrc.yaml"
+  }
 }

@@ -9,7 +9,7 @@ on:
 
 jobs:
   dockerHubDescription:
-    name:
+    name: Update Docker-Hub description
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

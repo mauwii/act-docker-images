@@ -1,11 +1,15 @@
 {
-	"recommendations": [
-		"editorconfig.editorconfig",
-		"esbenp.prettier-vscode",
-		"exiasr.hadolint",
-		"foxundermoon.shell-format",
-		"github.vscode-github-actions",
-		"mads-hartmann.bash-ide-vscode",
-		"ms-azuretools.vscode-docker"
-	]
+  "recommendations": [
+    "AquaSecurityOfficial.trivy-vulnerability-scanner",
+    // "Bridgecrew.checkov" // disabled since needs registration and cucrently unnecessary
+    "editorconfig.editorconfig",
+    "esbenp.prettier-vscode",
+    "exiasr.hadolint",
+    "foxundermoon.shell-format",
+    "github.vscode-github-actions",
+    "mads-hartmann.bash-ide-vscode",
+    "ms-azuretools.vscode-docker",
+    "MS-CST-E.vscode-devskim",
+    "streetsidesoftware.code-spell-checker"
+  ]
 }

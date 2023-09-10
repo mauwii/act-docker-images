@@ -134,6 +134,7 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           write-comment: true
 
+  # ToDo: Move into a separate workflow and depend on ci and mega-linter
   approve-pr:
     name: Approve PR
     runs-on: ubuntu-latest
@@ -146,34 +147,36 @@ jobs:
           PR_URL: ${{github.event.pull_request.html_url}}
           GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
 
+      # # Disabling this since I enabled the auto-merge option for the repo
       # - name: Merge PR
       #   run: gh pr merge --auto --merge "$PR_URL"
       #   env:
       #     PR_URL: ${{github.event.pull_request.html_url}}
       #     GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
 
-      - name: Clean cache
-        run: |
-          gh extension install actions/gh-actions-cache
+      # # Disabling this since github-actions-cache is currently not used
+      # - name: Clean cache
+      #   run: |
+      #     gh extension install actions/gh-actions-cache
 
-          REPO=${{ github.repository }}
-          BRANCH=refs/heads/${{ github.head_ref }}
+      #     REPO=${{ github.repository }}
+      #     BRANCH=refs/heads/${{ github.head_ref }}
 
-          echo "Fetching list of cache key"
-          cacheKeysForPR=$(gh actions-cache list -R "${REPO}" -B "${BRANCH}" | cut -f 1)
+      #     echo "Fetching list of cache key"
+      #     cacheKeysForPR=$(gh actions-cache list -R "${REPO}" -B "${BRANCH}" | cut -f 1)
 
-          if [ -n "$cacheKeysForPR" ]; then
-              ## Setting this to not fail the workflow while deleting cache keys.
-              set +e
-              echo "Deleting caches..."
-              for cacheKey in $cacheKeysForPR; do
-                  gh actions-cache delete "${cacheKey}" -R "${REPO}" -B "${BRANCH}" --confirm
-              done
-              echo "Done"
-              ## Restore the fail on error.
-              set -e
-          else
-              echo "No cache keys found for this PR"
-          fi
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      #     if [ -n "$cacheKeysForPR" ]; then
+      #         ## Setting this to not fail the workflow while deleting cache keys.
+      #         set +e
+      #         echo "Deleting caches..."
+      #         for cacheKey in $cacheKeysForPR; do
+      #             gh actions-cache delete "${cacheKey}" -R "${REPO}" -B "${BRANCH}" --confirm
+      #         done
+      #         echo "Done"
+      #         ## Restore the fail on error.
+      #         set -e
+      #     else
+      #         echo "No cache keys found for this PR"
+      #     fi
+      #   env:
+      #     GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
