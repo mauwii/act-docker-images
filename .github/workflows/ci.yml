@@ -23,7 +23,6 @@ jobs:
     strategy:
       matrix:
         platforms: ['linux/amd64,linux/arm64']
-        # platforms: ${{ github.event_name == 'pull_request' && fromJson(format('["{0}", "{1}"]', 'linux/amd64','linux/arm64')) || fromJson('["linux/amd64,linux/arm64"]') }}
         from-version: ['22.04', '20.04']
         include:
           - from-version: '22.04'
@@ -43,13 +42,12 @@ jobs:
         image: registry:2
         ports:
           - 5000:5000
-        # options: --entrypoint /bin/registry
     env:
       CACHE_FROM_REGISTRY: docker.io
       IMAGE_NAME: ${{ format('{0}-{1}', matrix.distro, matrix.from-flavor) }}
       IMAGE_REPOSITORY: ${{ format('{0}/{1}-{2}', vars.DOCKERHUB_USER || github.repository_owner, matrix.distro, matrix.from-flavor) }}
       SHA: ${{ github.event.pull_request.head.sha || github.event.after }}
-      REGISTRY: ${{ github.ref == 'refs/heads/main' && format('{0}', vars.DOCKERHUB_USER != '' && 'docker.io' || 'ghcr.io') || 'localhost:5000' }}
+      REGISTRY: ${{ github.ref != 'refs/heads/main' && 'localhost:5000' || (vars.DOCKERHUB_USER && 'docker.io' || 'ghcr.io') }}
     steps:
       - uses: actions/checkout@v4
 
@@ -98,16 +96,13 @@ jobs:
         uses: docker/metadata-action@v4.6.0
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          # images: ${{ github.actor != 'nektos/act' && format('{0}/{1}', env.REGISTRY, env.IMAGE_REPOSITORY) || env.IMAGE_REPOSITORY }}
-          images: |
-            ${{ env.REGISTRY }}/${{ vars.DOCKERHUB_USER }}/${{ env.IMAGE_NAME }}
-            ${{ vars.DOCKERHUB_USER }}/${{ env.IMAGE_NAME }}
+          images: ${{ github.actor == 'nektos/act' && env.IMAGE_REPOSITORY || env.REGISTRY_IMAGE }}
           tags: |
-            type=sha,prefix=${{ matrix.from-version }}-,format=short,enable={{is_default_branch}},priority=1000
-            type=raw,value=${{ matrix.from-version }},enable={{is_default_branch}},priority=900
+            type=sha,prefix=${{ matrix.from-version }}-,format=short,enable=${{ github.ref == 'refs/heads/main' }},priority=1000
+            type=raw,value=${{ matrix.from-version }},enable=${{ github.ref == 'refs/heads/main' }},priority=900
             type=raw,value=${{ matrix.from-version }}-${{ github.head_ref || github.ref_name }},priority=600
           flavor: |
-            latest=${{ github.ref == format('refs/heads/{0}', 'main') && matrix.from-version == '22.04' }}
+            latest=${{ github.ref == 'refs/heads/main' && matrix.from-version == '22.04' }}
           labels: |
             org.opencontainers.image.authors=['${{ env.REPOSITORY_LINK }}','${{ github.actor }}']
             org.opencontainers.image.description=${{ github.event.repository.description }}
@@ -118,6 +113,7 @@ jobs:
             org.opencontainers.image.url=${{ env.REPOSITORY_LINK }}/blob/${{ env.SHA }}/linux/${{ matrix.distro }}/Dockerfile
             org.opencontainers.image.vendor=${{ github.repository_owner }}
         env:
+          REGISTRY_IMAGE: ${{ format('{0}/{1}', env.REGISTRY, env.IMAGE_REPOSITORY) }}
           REPOSITORY_LINK: https://github.com/${{ github.repository }}
 
       # Build and push Docker image with Buildx (don't push on PR)
@@ -133,6 +129,7 @@ jobs:
           platforms: ${{ matrix.platforms }}
           labels: ${{ steps.meta.outputs.labels }}
           tags: ${{ steps.meta.outputs.tags }}
+          # tags: ${{ format('{0}:{1}-{2}', github.actor != 'nektos/act' && env.REGISTRY_IMAGE || env.IMAGE_REPOSITORY, matrix.from-version, github.head_ref || github.ref_name) }}
           build-args: |
             FROM_IMAGE=buildpack-deps
             FROM_VERSION_MAJOR=${{ matrix.from-version-major }}
@@ -161,11 +158,10 @@ jobs:
         continue-on-error: true
         uses: docker/scout-action@v0.23.4
         with:
-          command: ${{ github.ref == 'refs/heads/main' && 'sbom,compare' || 'compare' }}
-          image: ${{ github.actor != 'nektos/act' && steps.meta.outputs.tags || format('{0}:{1}-{2}', env.IMAGE_REPOSITORY, matrix.from-version, github.head_ref || github.ref_name) }}
-          # image: ${{ steps.meta.outputs.tags }}
-          # image: ${{ format('{0}:{1}-{2}', env.IMAGE_REPOSITORY, matrix.from-version, github.head_ref || github.ref_name) }}
-          to: ${{ format('{0}/{1}:{2}-{3}', env.CACHE_FROM_REGISTRY, env.IMAGE_REPOSITORY, matrix.from-version, 'main') }}
+          command: sbom,compare
+          image: ${{ steps.meta.outputs.tags }}
+          # image: ${{ github.actor == 'nektos/act' && env.IMAGE || env.REGISTRY_IMAGE }}
+          to: ${{ format('{0}/{1}:{2}', env.CACHE_FROM_REGISTRY, env.IMAGE_REPOSITORY, matrix.from-version) }}
           organization: ${{ vars.DOCKERHUB_USER }}
           ignore-unchanged: true
           only-severities: critical
@@ -175,6 +171,9 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           dockerhub-user: ${{ vars.DOCKERHUB_USER }}
           dockerhub-password: ${{ secrets.DOCKERHUB_TOKEN }}
+        env:
+          IMAGE: ${{ format('{0}:{1}-{2}', env.IMAGE_REPOSITORY, matrix.from-version, github.head_ref || github.ref_name) }}
+          REGISTRY_IMAGE: ${{ format('{0}/{1}:{2}-{3}', env.REGISTRY, env.IMAGE_REPOSITORY, matrix.from-version, github.head_ref || github.ref_name) }}
 
   # ToDo: Move into a separate workflow and depend on ci and mega-linter
   approve-pr:
