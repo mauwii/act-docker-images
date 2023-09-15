@@ -155,10 +155,6 @@ jobs:
           REGISTRY_IMAGE: ${{ format('{0}/{1}', env.REGISTRY, env.IMAGE_REPOSITORY) }}
           CACHE_FROM_REGISTRY_IMAGE: ${{ format('{0}/{1}', env.CACHE_FROM_REGISTRY, env.IMAGE_REPOSITORY) }}
 
-      - run: docker image inspect "${IMAGE_NAME}"
-        env:
-          IMAGE_NAME: ${{ format('{0}:{1}-{2}', env.IMAGE_NAME, matrix.from-version, github.head_ref || github.ref_name) }}
-
       # vulnerability scanning to verify PRs
       - name: Docker Scout
         id: docker-scout
