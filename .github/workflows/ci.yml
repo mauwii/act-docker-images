@@ -23,6 +23,7 @@ jobs:
     strategy:
       matrix:
         platforms: ${{ github.event_name == 'pull_request' && fromJson(format('["{0}","{1}"]', 'linux/amd64','linux/arm64')) || fromJson('["linux/amd64,linux/arm64"]') }}
+        from-version: [ '22.04', '20.04' ]
         include:
           - from-version: '22.04'
             from-version-major: '22'
@@ -39,7 +40,8 @@ jobs:
     services:
       registry:
         image: registry:2
-        ports: [5000]
+        ports:
+          - 5000:5000
         # options: --entrypoint /bin/registry
     env:
       CACHE_FROM_REGISTRY: docker.io
@@ -62,9 +64,14 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2.10.0
         with:
-          driver: ${{ github.event_name == 'pull_request' && 'docker' || 'docker-container' }}
-          driver-opts: ${{ github.event_name == 'pull_request' && 'network=host,image=moby/buildkit:v0.12.2' || '' }}
-          install: ${{ github.event_name == 'pull_request' && true || false }}
+          driver: docker-container
+          # driver: ${{ github.event_name == 'pull_request' && 'docker' || 'docker-container' }}
+          driver-opts: |
+            image=moby/buildkit:v0.12.2
+            ${{ github.event_name == 'pull_request' && 'network=host' || '' }}
+          install: true
+          # install: ${{ github.event_name == 'pull_request' && 'true' || 'false' }}
+          platforms: ${{ matrix.platforms }}
 
       # - name: Login to GitHub Container Registry
       #   uses: docker/login-action@v2.1.0
@@ -79,7 +86,7 @@ jobs:
         uses: docker/login-action@v2.2.0
         if: vars.DOCKERHUB_USER != ''
         with:
-          registry: ${{ env.CACHE_FROM_REGISTRY }}
+          registry: docker.io
           username: ${{ vars.DOCKERHUB_USER }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
           logout: true
@@ -98,6 +105,7 @@ jobs:
             type=raw,value=${{ matrix.from-version }}-${{ github.head_ref || github.ref_name }},priority=600
           flavor: |
             latest=${{ github.ref == format('refs/heads/{0}', 'main') && matrix.from-version == '22.04' }}
+            ${{ github.event_name == 'pull_request' && format('suffix=-{0}', matrix.platforms) || '' }}
           labels: |
             org.opencontainers.image.authors=['${{ env.REPOSITORY_LINK }}','${{ github.actor }}']
             org.opencontainers.image.description=${{ github.event.repository.description }}
@@ -134,7 +142,7 @@ jobs:
           cache-from: |
             ${{ format('type=registry,ref={0}:{1}', env.CACHE_FROM_REGISTRY, matrix.from-version) }}
             ${{ format('type=registry,ref={0}:cache-{1}',env.CACHE_FROM_REGISTRY, matrix.codename) }}
-          # cache exporter doesn't work with docker driver
+          # don't export cache on PR
           cache-to: ${{ github.event_name != 'pull_request' && format('type=registry,ref={0}:cache-{1},mode=max',env.REGISTRY_IMAGE, matrix.codename) || '' }}
           # this will give us some useful information about the build
           provenance: mode=max
