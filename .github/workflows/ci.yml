@@ -159,9 +159,10 @@ jobs:
         uses: docker/scout-action@v0.23.4
         with:
           command: sbom,compare
-          image: ${{ steps.meta.outputs.tags }}
+          # image: ${{ steps.meta.outputs.tags }}
           # image: ${{ github.actor != 'nektos/act' && steps.meta.outputs.tags || format('{0}:{1}-{2}', env.IMAGE_REPOSITORY, matrix.from-version, github.head_ref || github.ref_name) }}
-          to: ${{ format('{0}/{1}:{2}', env.CACHE_FROM_REGISTRY, env.IMAGE_REPOSITORY, matrix.from-version) }}
+          image: ${{ format('{0}:{1}-{2}', env.IMAGE_REPOSITORY, matrix.from-version, github.head_ref || github.ref_name) }}
+          to: ${{ format('{0}/{1}:{2}-{3}', env.CACHE_FROM_REGISTRY, env.IMAGE_REPOSITORY, matrix.from-version, 'main') }}
           organization: ${{ vars.DOCKERHUB_USER }}
           ignore-unchanged: true
           only-severities: critical
