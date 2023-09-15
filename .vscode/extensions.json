@@ -1,6 +1,5 @@
 {
   "recommendations": [
-    "AquaSecurityOfficial.trivy-vulnerability-scanner",
     "editorconfig.editorconfig",
     "esbenp.prettier-vscode",
     "exiasr.hadolint",
