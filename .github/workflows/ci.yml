@@ -22,7 +22,8 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        platforms: ${{ github.event_name == 'pull_request' && fromJson(format('["{0}", "{1}"]', 'linux/amd64','linux/arm64')) || fromJson('["linux/amd64,linux/arm64"]') }}
+        platforms: ['linux/amd64,linux/arm64']
+        # platforms: ${{ github.event_name == 'pull_request' && fromJson(format('["{0}", "{1}"]', 'linux/amd64','linux/arm64')) || fromJson('["linux/amd64,linux/arm64"]') }}
         from-version: ['22.04', '20.04']
         include:
           - from-version: '22.04'
@@ -46,9 +47,9 @@ jobs:
     env:
       CACHE_FROM_REGISTRY: docker.io
       IMAGE_NAME: ${{ format('{0}-{1}', matrix.distro, matrix.from-flavor) }}
-      IMAGE_REPOSITORY: ${{ format('{0}/{1}-{2}', github.repository_owner, matrix.distro, matrix.from-flavor) }}
+      IMAGE_REPOSITORY: ${{ format('{0}/{1}-{2}', vars.DOCKERHUB_USER || github.repository_owner, matrix.distro, matrix.from-flavor) }}
       SHA: ${{ github.event.pull_request.head.sha || github.event.after }}
-      REGISTRY: ${{ github.event_name == 'pull_request' && format('{0}:{1}','localhost', '5000') || 'docker.io' }}
+      REGISTRY: ${{ github.ref == 'refs/heads/main' && format('{0}', vars.DOCKERHUB_USER != '' && 'docker.io' || 'ghcr.io') || 'localhost:5000' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -65,20 +66,19 @@ jobs:
         uses: docker/setup-buildx-action@v2.10.0
         with:
           driver: docker-container
-          # driver: ${{ github.event_name == 'pull_request' && 'docker' || 'docker-container' }}
-          driver-opts: |
-            image=moby/buildkit:v0.12.2
-            ${{ github.event_name == 'pull_request' && 'network=host' || '' }}
+          driver-opts: image=moby/buildkit:v0.12.2${{ github.ref != 'refs/heads/main' && ',network=host' || '' }}
           install: true
-          # install: ${{ github.event_name == 'pull_request' && 'true' || 'false' }}
           platforms: ${{ matrix.platforms }}
 
-      # - name: Login to GitHub Container Registry
-      #   uses: docker/login-action@v2.1.0
-      #   with:
-      #     registry: ghcr.io
-      #     username: ${{ github.repository_owner }}
-      #     password: ${{ secrets.GITHUB_TOKEN }}
+      # Login to github container registry
+      # https://github.com/docker/login-action
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v2.1.0
+        if: vars.DOCKERHUB_USER == ''
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       # Login against a Docker registry
       # https://github.com/docker/login-action
@@ -98,14 +98,13 @@ jobs:
         uses: docker/metadata-action@v4.6.0
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          images: ${{ github.event_name != 'pull_request' && format('{0}/{1}', env.REGISTRY, env.IMAGE_REPOSITORY) || env.IMAGE_REPOSITORY }}
+          images: ${{ github.actor != 'nektos/act' && format('{0}/{1}', env.REGISTRY, env.IMAGE_REPOSITORY) || env.IMAGE_REPOSITORY }}
           tags: |
             type=sha,prefix=${{ matrix.from-version }}-,format=short,enable={{is_default_branch}},priority=1000
             type=raw,value=${{ matrix.from-version }},enable={{is_default_branch}},priority=900
             type=raw,value=${{ matrix.from-version }}-${{ github.head_ref || github.ref_name }},priority=600
           flavor: |
             latest=${{ github.ref == format('refs/heads/{0}', 'main') && matrix.from-version == '22.04' }}
-            ${{ github.event_name == 'pull_request' && format('suffix=-{0}', matrix.platforms) || '' }}
           labels: |
             org.opencontainers.image.authors=['${{ env.REPOSITORY_LINK }}','${{ github.actor }}']
             org.opencontainers.image.description=${{ github.event.repository.description }}
@@ -143,11 +142,12 @@ jobs:
             ${{ format('type=registry,ref={0}:{1}', env.CACHE_FROM_REGISTRY_IMAGE, matrix.from-version) }}
             ${{ format('type=registry,ref={0}:cache-{1}', env.CACHE_FROM_REGISTRY_IMAGE, matrix.codename) }}
           # don't export cache on PR
-          cache-to: ${{ github.event_name != 'pull_request' && format('type=registry,ref={0}:cache-{1},mode=max', env.REGISTRY_IMAGE, matrix.codename) || '' }}
+          cache-to: ${{ github.ref == 'refs/heads/main' && format('type=registry,ref={0}:cache-{1},mode=max', env.REGISTRY_IMAGE, matrix.codename) || '' }}
           # this will give us some useful information about the build
           provenance: mode=max
-          # push if ref is refs/heads/main
-          push: ${{ github.ref == 'refs/heads/main' }}
+          # push if not building with act
+          push: ${{ github.actor != 'nektos/act' }}
+          load: ${{ github.actor == 'nektos/act' }}
         env:
           REGISTRY_IMAGE: ${{ format('{0}/{1}', env.REGISTRY, env.IMAGE_REPOSITORY) }}
           CACHE_FROM_REGISTRY_IMAGE: ${{ format('{0}/{1}', env.CACHE_FROM_REGISTRY, env.IMAGE_REPOSITORY) }}
@@ -160,7 +160,7 @@ jobs:
         with:
           command: sbom,compare
           image: ${{ steps.meta.outputs.tags }}
-          # image: ${{ format('{0}:{1}-{2}', env.IMAGE_REPOSITORY, matrix.from-version, github.head_ref || github.ref_name) }}
+          # image: ${{ github.actor != 'nektos/act' && steps.meta.outputs.tags || format('{0}:{1}-{2}', env.IMAGE_REPOSITORY, matrix.from-version, github.head_ref || github.ref_name) }}
           to: ${{ format('{0}/{1}:{2}', env.CACHE_FROM_REGISTRY, env.IMAGE_REPOSITORY, matrix.from-version) }}
           organization: ${{ vars.DOCKERHUB_USER }}
           ignore-unchanged: true
