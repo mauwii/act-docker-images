@@ -38,11 +38,16 @@ jobs:
             distro: 'ubuntu'
             codename: 'focal'
             from-flavor: 'act'
+    services:
+      registry:
+        image: registry:2
+        ports:
+          - 5000:5000
     env:
       IMAGE_NAME: ${{ format('{0}-{1}', matrix.distro, matrix.from-flavor) }}
       IMAGE_REPOSITORY: ${{ format('{0}/{1}-{2}', vars.DOCKERHUB_USER || github.repository_owner, matrix.distro, matrix.from-flavor) }}
       SHA: ${{ github.event.pull_request.head.sha || github.event.after }}
-      FROM_TAG: ${{ format('{0}/{1}/{2}-{3}:{4}-{5}', 'docker.io', vars.DOCKERHUB_USER, matrix.distro, matrix.from-flavor, matrix.from-version, github.head_ref || github.ref_name) }}
+      FROM_TAG: ${{ format('{0}/{1}/{2}-{3}:{4}-{5}', github.ref == 'refs/heads/main' && 'docker.io' || 'localhost:5000', vars.DOCKERHUB_USER, matrix.distro, matrix.from-flavor, matrix.from-version, github.head_ref || github.ref_name) }}
       TO_TAG: ${{ format('{0}/{1}/{2}-{3}:{4}', 'docker.io', vars.DOCKERHUB_USER, matrix.distro, matrix.from-flavor, matrix.from-version) }}
       REGISTRY: ${{ vars.DOCKERHUB_USER && 'docker.io' || 'ghcr.io' }}
     steps:
@@ -61,9 +66,14 @@ jobs:
         uses: docker/setup-buildx-action@v2.10.0
         with:
           driver: docker-container
-          driver-opts: image=moby/buildkit:v0.12.2${{ github.ref != 'refs/heads/main' && ',network=host' || '' }}
+          driver-opts: image=moby/buildkit:v0.12.2,network=host
           install: true
+          use: true
+          cleanup: true
           platforms: ${{ matrix.platforms }}
+          config-inline: |
+            [registry."localhost:5000"]
+              insecure = true
 
       # Login to github container registry
       # https://github.com/docker/login-action
@@ -101,7 +111,7 @@ jobs:
           flavor: |
             latest=${{ github.ref == 'refs/heads/main' && matrix.from-version == '22.04' }}
           labels: |
-            org.opencontainers.image.authors=['${{ env.REPOSITORY_LINK }}','${{ github.actor }}']
+            org.opencontainers.image.authors='${{ env.REPOSITORY_LINK }},${{ github.actor }}'
             org.opencontainers.image.description=${{ github.event.repository.description }}
             org.opencontainers.image.documentation=${{ env.REPOSITORY_LINK }}
             org.opencontainers.image.revision=${{ env.SHA }}
@@ -115,10 +125,10 @@ jobs:
 
       - name: build image
         run: >-
+          # ${{ github.ref == 'refs/heads/main' && '--push' || '--load' }}
           docker build
-          --tag ${{ env.FROM_TAG }}
+          --tag ${{ env.FROM_TAG }} --push
           --file linux/${{ matrix.distro }}/Dockerfile
-          ${{ github.ref == 'refs/heads/main' && '--push' || '--load' }}
           --cache-from ${{ format('type=registry,ref={0}:{1}', env.REGISTRY_IMAGE, matrix.from-version) }}
           --cache-from ${{ format('type=registry,ref={0}:cache-{1}', env.REGISTRY_IMAGE, matrix.codename) }}
           --build-arg FROM_IMAGE=buildpack-deps
@@ -139,13 +149,12 @@ jobs:
       # vulnerability scanning to verify PRs
       - name: Docker Scout
         id: docker-scout
-        continue-on-error: true
         uses: docker/scout-action@v0.23.4
         with:
-          command: ${{github.ref == '/refs/heads/main' && 'sbom' || 'compare' }}
+          platform: ${{ matrix.platforms }}
+          command: sbom,compare
           image: ${{ env.FROM_TAG }}
           to: ${{ env.TO_TAG }}
-          organization: ${{ vars.DOCKERHUB_USER }}
           ignore-unchanged: true
           only-severities: critical
           write-comment: ${{ github.actor != 'nektos/act' }}
