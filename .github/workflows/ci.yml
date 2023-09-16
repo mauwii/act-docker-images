@@ -52,6 +52,7 @@ jobs:
       # FROM_TAG: ${{ format('{0}/{1}/{2}-{3}:{4}-{5}', github.ref == 'refs/heads/main' && 'docker.io' || 'localhost:5000', vars.DOCKERHUB_USER, matrix.distro, matrix.from-flavor, matrix.from-version, github.head_ref || github.ref_name) }}
       TO_TAG: ${{ format('{0}/{1}/{2}-{3}:{4}', 'docker.io', vars.DOCKERHUB_USER, matrix.distro, matrix.from-flavor, matrix.from-version) }}
       REGISTRY: ${{ vars.DOCKERHUB_USER && 'docker.io' || 'ghcr.io' }}
+      PATH_TO_IMAGE: /tmp/${{ matrix.from-version }}/${{ matrix.platforms }}/${{ matrix.distro }}-${{ matrix.from-flavor }}.tar
     steps:
       - uses: actions/checkout@v4
 
@@ -136,7 +137,7 @@ jobs:
           --build-arg FROM_FLAVOR=${{ matrix.from-flavor }}
           --build-arg DISTRO=${{ matrix.distro }}
           --build-arg CODENAME=${{ matrix.codename }}
-          ${{ github.ref == 'refs/heads/main' && '--push' || '--output type=docker,dest=/tmp/${{ matrix.distro }}-act-${{ matrix.from-version }}.tar' }}
+          ${{ github.ref == 'refs/heads/main' && '--push' || format('--output type=docker,dest={0}',  env.PATH_TO_IMAGE) }}
           .
         env:
           REGISTRY_IMAGE: ${{ format('{0}/{1}', env.REGISTRY, env.IMAGE_REPOSITORY) }}
@@ -155,7 +156,7 @@ jobs:
           platform: ${{ matrix.platforms }}
           command: sbom,compare
           # image: ${{ env.FROM_TAG }}
-          image: /tmp/${{ matrix.distro }}-act-${{ matrix.from-version }}.tar
+          image: ${{ env.PATH_TO_IMAGE}}
           type: archive
           to: ${{ env.TO_TAG }}
           ignore-unchanged: true
