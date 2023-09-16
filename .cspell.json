@@ -33,6 +33,7 @@
     "dnsutils",
     "dockerhub",
     "dpkg",
+    "elif",
     "fakeroot",
     "getversion",
     "gfortran",
