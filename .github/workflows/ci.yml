@@ -149,20 +149,30 @@ jobs:
           # this will give us some useful information about the build
           provenance: mode=max
           # push if not building with act
-          push: ${{ github.actor != 'nektos/act' }}
-          load: ${{ github.actor == 'nektos/act' }}
+          push: ${{ github.ref == 'refs/heads/main' }}
+          load: ${{ github.ref != 'refs/heads/main' }}
         env:
           REGISTRY_IMAGE: ${{ format('{0}/{1}', env.REGISTRY, env.IMAGE_REPOSITORY) }}
           CACHE_FROM_REGISTRY_IMAGE: ${{ format('{0}/{1}', env.CACHE_FROM_REGISTRY, env.IMAGE_REPOSITORY) }}
 
       - name: inspect image
         continue-on-error: true
-        run: docker inspect ${{ steps.meta.outputs.tags }}
+        run: docker inspect ${{ env.REGISTRY }}/${{ vars.DOCKERHUB_USER }}/${{ env.IMAGE_NAME }}:${{ matrix.from-version }}-${{ github.head_ref || github.ref_name }}
 
       - name: pull image
         continue-on-error: true
         if: github.actor != 'nektos/act'
         run: docker pull ${{ env.REGISTRY }}/${{ vars.DOCKERHUB_USER }}/${{ env.IMAGE_NAME }}:${{ matrix.from-version }}-${{ github.head_ref || github.ref_name }}
+
+      # - name: Run Trivy vulnerability scanner
+      #   uses: aquasecurity/trivy-action@master
+      #   with:
+      #     image-ref: '${{ steps.meta.outputs.tags }}'
+      #     format: 'table'
+      #     exit-code: '1'
+      #     ignore-unfixed: true
+      #     vuln-type: 'os,library'
+      #     severity: 'CRITICAL,HIGH'
 
       # vulnerability scanning to verify PRs
       - name: Docker Scout
