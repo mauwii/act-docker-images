@@ -178,7 +178,7 @@ jobs:
           --label org.opencontainers.image.documentation='${{ env.REPOSITORY_LINK }}'
           --label org.opencontainers.image.revision='${{ env.SHA }}'
           --label org.opencontainers.image.source='${{ github.repositoryUrl }}'
-          --label org.opencontainers.image.title='${{ env.IMAGE_REPOSITORY }}:${{ github.head_ref || github.ref_name }}'
+          --label org.opencontainers.image.title='${{ env.TITLE_TAG }}'
           --label org.opencontainers.image.url='${{ env.REPOSITORY_LINK }}/blob/${{ env.SHA }}/linux/${{ matrix.distro }}/Dockerfile'
           --label org.opencontainers.image.vendor='${{ github.repository_owner }}'
           .
@@ -186,6 +186,7 @@ jobs:
           IS_MAIN: ${{ github.ref == 'refs/heads/main' }}
           REGISTRY_IMAGE: ${{ format('{0}/{1}', env.REGISTRY, env.IMAGE_REPOSITORY) }}
           REPOSITORY_LINK: https://github.com/${{ github.repository }}
+          TITLE_TAG: ${{ format('{0}:{1}', env.IMAGE_REPOSITORY, github.head_ref || github.ref_name) }}
 
       # Just for debugging
       - name: inspect FROM_TAG
