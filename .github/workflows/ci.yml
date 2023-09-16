@@ -44,6 +44,7 @@ jobs:
         ports:
           - 5000:5000
     env:
+      BUILDKIT_PROGRESS: plain
       IMAGE_NAME: ${{ format('{0}-{1}', matrix.distro, matrix.from-flavor) }}
       IMAGE_REPOSITORY: ${{ format('{0}/{1}-{2}', vars.DOCKERHUB_USER || github.repository_owner, matrix.distro, matrix.from-flavor) }}
       SHA: ${{ github.event.pull_request.head.sha || github.event.after }}
@@ -121,6 +122,7 @@ jobs:
           REGISTRY_IMAGE: ${{ format('{0}/{1}', env.REGISTRY, env.IMAGE_REPOSITORY) }}
           REPOSITORY_LINK: https://github.com/${{ github.repository }}
 
+      # Build and push Docker images
       - name: build image
         run: >-
           docker build
@@ -128,18 +130,19 @@ jobs:
           --file linux/${{ matrix.distro }}/Dockerfile
           --cache-from ${{ format('type=registry,ref={0}:{1}', env.REGISTRY_IMAGE, matrix.from-version) }}
           --cache-from ${{ format('type=registry,ref={0}:cache-{1}', env.REGISTRY_IMAGE, matrix.codename) }}
-          ${{ github.ref == 'refs/heads/main' && '--push' || '--load' }}
           --build-arg FROM_IMAGE=buildpack-deps
           --build-arg FROM_VERSION_MAJOR=${{ matrix.from-version-major }}
           --build-arg FROM_VERSION_MINOR=${{ matrix.from-version-minor }}
           --build-arg FROM_FLAVOR=${{ matrix.from-flavor }}
           --build-arg DISTRO=${{ matrix.distro }}
           --build-arg CODENAME=${{ matrix.codename }}
+          ${{ github.ref == 'refs/heads/main' && '--push' || '--output type=docker,dest=/tmp/${{ matrix.distro }}-act-${{ matrix.from-version }}.tar' }}
           .
         env:
           REGISTRY_IMAGE: ${{ format('{0}/{1}', env.REGISTRY, env.IMAGE_REPOSITORY) }}
           CACHE_FROM_REGISTRY_IMAGE: ${{ format('{0}/{1}', env.REGISTRY, env.IMAGE_REPOSITORY) }}
 
+      # Just for debugging
       - name: inspect image
         continue-on-error: true
         run: docker inspect ${{ env.FROM_TAG }}
@@ -151,7 +154,9 @@ jobs:
         with:
           platform: ${{ matrix.platforms }}
           command: sbom,compare
-          image: ${{ env.FROM_TAG }}
+          # image: ${{ env.FROM_TAG }}
+          image: /tmp/${{ matrix.distro }}-act-${{ matrix.from-version }}.tar
+          type: archive
           to: ${{ env.TO_TAG }}
           ignore-unchanged: true
           only-severities: critical
