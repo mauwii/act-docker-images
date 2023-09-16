@@ -1,10 +1,11 @@
 # yaml-language-server: $schema=https://json.schemastore.org/github-action.json
 
-name: Free some disk space
+name: Free disk space
 author: mauwii
-description: |
-  This Action can be used to free up some disk-space on
-  github hosted runners
+description: This Action can be used to free up some disk-space on github hosted runners
+branding:
+  icon: 'trash-2'
+  color: 'blue'
 
 inputs:
   deleteDotnet:
@@ -26,8 +27,8 @@ runs:
       shell: bash
       run: |
         for dir in /usr/share/dotnet /opt/hostedtoolcache/dotnet; do
-          if [ -d $dir ]; then
-            sudo rm -Rf $dir # Ubuntu 18/20
+          if [ -d "${dir}" ]; then
+            sudo rm -Rf "${dir}"
           fi
         done
 

@@ -30,8 +30,11 @@
     "editor.tabSize": 2
   },
   "shellformat.flag": "--indent 4 --binary-next-line --case-indent",
+  "yaml.format.singleQuote": true,
   "yaml.schemas": {
-    "https://json.schemastore.org/github-action.json": "./.github/actions/**.yml",
-    "https://json.schemastore.org/prettierrc.json": "./.prettierrc.yaml"
+    "https://json.schemastore.org/github-action.json": [
+      "action.yaml",
+      "action.yml"
+    ]
   }
 }

@@ -1,16 +1,16 @@
 # 🐳 Docker images for [nektos/act](https://github.com/nektos/act)
 
-[![Docker Pulls](https://badgen.net/docker/pulls/mauwii/ubuntu-act?icon=docker&label=pulls)](https://hub.docker.com/r/mauwii/ubuntu-act/)
-[![Docker Image Size](https://badgen.net/docker/size/mauwii/ubuntu-act?icon=docker&label=image%20size)](https://hub.docker.com/r/mauwii/ubuntu-act/)
-[![Docker Stars](https://badgen.net/docker/stars/mauwii/ubuntu-act?icon=docker&label=stars)](https://hub.docker.com/r/mauwii/ubuntu-act/)
-[![Github stars](https://badgen.net/github/stars/mauwii/act-docker-images?icon=github&label=stars)](https://github.com/mauwii/act-docker-images)
-[![Github forks](https://badgen.net/github/forks/mauwii/act-docker-images?icon=github&label=forks)](https://github.com/mauwii/act-docker-images/fork)
-[![Github issues](https://badgen.net/github/issues/mauwii/act-docker-images/?icon=github&label=issues)](https://github.com/mauwii/act-docker-images/issues)
-[![Github last-commit](https://badgen.net/github/last-commit/mauwii/act-docker-images/?color=blue&icon=github&label=last-commit)](https://github.com/mauwii/act-docker-images/commits/)
+[![Docker Pulls](https://badgen.net/docker/pulls/mauwii/ubuntu-act?icon=docker&label=pulls)][dockerHub]
+[![Docker Image Size](https://badgen.net/docker/size/mauwii/ubuntu-act?icon=docker&label=image%20size)][dockerHub]
+[![Docker Stars](https://badgen.net/docker/stars/mauwii/ubuntu-act?icon=docker&label=stars)][dockerHub]
+[![Github stars](https://badgen.net/github/stars/mauwii/act-docker-images?icon=github&label=stars)][githubRepo]
+[![Github forks](https://badgen.net/github/forks/mauwii/act-docker-images?icon=github&label=forks)][githubFork]
+[![Github issues](https://badgen.net/github/issues/mauwii/act-docker-images/?icon=github&label=issues)][githubIssues]
+[![Github last-commit](https://badgen.net/github/last-commit/mauwii/act-docker-images/?color=blue&icon=github&label=last-commit)][githubCommits]
 
-[![ci](https://github.com/mauwii/act-docker-images/actions/workflows/ci.yml/badge.svg?branch=main&event=push)](https://github.com/mauwii/act-docker-images/actions/workflows/ci.yml)
-[![Docker-Hub description](https://github.com/mauwii/act-docker-images/actions/workflows/dockerhub-description.yml/badge.svg?branch=main)](https://github.com/mauwii/act-docker-images/actions/workflows/dockerhub-description.yml)
-[![MegaLinter](https://github.com/mauwii/act-docker-images/workflows/MegaLinter/badge.svg?branch=main)](https://github.com/mauwii/act-docker-images/actions?query=workflow%3AMegaLinter+branch%3Amain)
+[![ci](https://github.com/mauwii/act-docker-images/actions/workflows/ci.yml/badge.svg?branch=main&event=push)][workflowCi]
+[![Docker-Hub description](https://github.com/mauwii/act-docker-images/actions/workflows/dockerhub-description.yml/badge.svg?branch=main)][workflowDhDesc]
+[![MegaLinter](https://github.com/mauwii/act-docker-images/workflows/MegaLinter/badge.svg?branch=main&event=push)][workflowMegaLinter]
 
 ## ⚠️ Heavily under construction... ⚠️
 
@@ -18,16 +18,15 @@
 
 ## What
 
-The docker images in this repository can be used with [nektos/act](https://github.com/nektos/act),
-which is a very handy tool to run your github workflows locally.
+The docker images in this repository can be used with [nektos/act][nektosActRepo], which is a very
+handy tool to run your github workflows locally.
 
 If you don't know it yet, I highly recommend to check it out 🤓
 
 ## Why
 
 In the other Images I had problems with executing azure related tools, so I decided to create my own
-image which is heavily inspired by the images of
-[catthehacker](https://github.com/catthehacker/docker_images)
+image which is heavily inspired by the images of [catthehacker][catthehackerImages]
 
 ## How to use
 
@@ -42,8 +41,8 @@ The easiest way is to add those lines in your `~/.actrc`:
 -P ubuntu-20.04=mauwii/ubuntu-act:20.04
 ```
 
-For further Informations about nektos/arc and how to use it, checkout the
-[nektos documentation📖](https://nektosact.com/beginner/index.html)
+For further Informations about nektos/arc and how to use it, checkout the [nektos
+documentation📖][nektosDocs]
 
 ## How I run act on my M2-Max 💻
 
@@ -59,13 +58,6 @@ For further Informations about nektos/arc and how to use it, checkout the
   alias act='gh act -s GITHUB_TOKEN="$(gh auth token)"'
   ```
 
-- export DOCKER_HOST env
-
-  ```bash
-  DOCKER_HOST=$(docker context inspect --format '{{.Endpoints.docker.Host}}')
-  export DOCKER_HOST
-  ```
-
 - Docker-Desktop settings:
 
   - Advanced:
@@ -75,6 +67,23 @@ For further Informations about nektos/arc and how to use it, checkout the
   - Features in Development:
 
     ✔️ All Beta Features enabled (containerd, wasm, rosetta and builds view)
+
+  - Docker Engine (`~/.docker/daemon.json`):
+
+    ```json
+    {
+      "builder": {
+        "gc": {
+          "defaultKeepStorage": "20GB",
+          "enabled": true
+        }
+      },
+      "experimental": true,
+      "features": {
+        "buildkit": true
+      }
+    }
+    ```
 
 - `~/.actrc`:
 
@@ -95,3 +104,21 @@ npx mega-linter-runner \
     -e GITHUB_TOKEN="$(gh auth token)" \
     --remove-container
 ```
+
+[dockerHub]: https://hub.docker.com/r/mauwii/ubuntu-act/ "DockerHub"
+[githubRepo]: https://github.com/mauwii/act-docker-images/ "GitHub repository"
+[githubFork]: https://github.com/mauwii/act-docker-images/fork/ "GitHub forks"
+[githubIssues]: https://github.com/mauwii/act-docker-images/issues/ "GitHub issues"
+[githubCommits]: https://github.com/mauwii/act-docker-images/commits/ "GitHub commits"
+[workflowCi]: https://github.com/mauwii/act-docker-images/actions/workflows/ci.yml "ci workflow"
+[workflowDhDesc]:
+  https://github.com/mauwii/act-docker-images/actions/workflows/dockerhub-description.yml
+  "DockerHub Description Workflow"
+[workflowMegaLinter]:
+  https://github.com/mauwii/act-docker-images/actions?query=workflow%3AMegaLinter+branch%3Amain
+  "MegaLinter Workflow"
+[nektosActRepo]: https://github.com/nektos/act "nektos/act git repository"
+[catthehackerImages]:
+  https://github.com/catthehacker/docker_images
+  "catthehacker/docker_images repo"
+[nektosDocs]: https://nektosact.com/beginner/index.html "nektos/act docs"

@@ -2,6 +2,7 @@ name: ci
 
 on:
   push:
+    branches: [main]
     paths:
       - '**/Dockerfile'
       - '**/toolsets/*.json'
@@ -21,6 +22,9 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
+        platforms: ['linux/amd64,linux/arm64']
+        # platforms: ${{ github.ref == 'refs/heads/main' && fromJson('["linux/amd64,linux/arm64"]') || fromJson(format('["{0}", "{1}"]', 'linux/amd64','linux/arm64')) }}
+        from-version: ['22.04', '20.04']
         include:
           - from-version: '22.04'
             from-version-major: '22'
@@ -34,13 +38,21 @@ jobs:
             distro: 'ubuntu'
             codename: 'focal'
             from-flavor: 'act'
+    services:
+      registry:
+        image: registry:2
+        ports:
+          - 5000:5000
     env:
-      REGISTRY: docker.io
+      BUILDKIT_PROGRESS: plain
       IMAGE_NAME: ${{ format('{0}-{1}', matrix.distro, matrix.from-flavor) }}
-      IMAGE_REPOSITORY: ${{ format('{0}/{1}', github.repository_owner, format('{0}-{1}', matrix.distro, matrix.from-flavor)) }}
+      IMAGE_REPOSITORY: ${{ format('{0}/{1}-{2}', vars.DOCKERHUB_USER || github.repository_owner, matrix.distro, matrix.from-flavor) }}
       SHA: ${{ github.event.pull_request.head.sha || github.event.after }}
-      DOCKERHUB_USERNAME: ${{ github.repository_owner }}
-      DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+      FROM_TAG: ${{ format('{0}-{1}:{2}-{3}', matrix.distro, matrix.from-flavor, matrix.from-version, github.head_ref || github.ref_name) }}
+      # FROM_TAG: ${{ format('{0}/{1}/{2}-{3}:{4}-{5}', github.ref == 'refs/heads/main' && 'docker.io' || 'localhost:5000', vars.DOCKERHUB_USER, matrix.distro, matrix.from-flavor, matrix.from-version, github.head_ref || github.ref_name) }}
+      TO_TAG: ${{ format('{0}/{1}/{2}-{3}:{4}', 'docker.io', vars.DOCKERHUB_USER, matrix.distro, matrix.from-flavor, matrix.from-version) }}
+      REGISTRY: ${{ vars.DOCKERHUB_USER && 'docker.io' || 'ghcr.io' }}
+      PATH_TO_IMAGE: /tmp/${{ matrix.distro }}-${{ matrix.from-version }}.tar
     steps:
       - uses: actions/checkout@v4
 
@@ -55,104 +67,152 @@ jobs:
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2.10.0
-        # with:
-        #   driver-opts: |
-        #     image=moby/buildkit:v0.12.2
-        #     network=host
+        with:
+          driver: docker-container
+          driver-opts: image=moby/buildkit:v0.12.2,network=host
+          install: true
+          use: true
+          cleanup: true
+          platforms: ${{ matrix.platforms }}
 
-      # - name: Login to GitHub Container Registry
-      #   uses: docker/login-action@v2.1.0
-      #   with:
-      #     registry: ghcr.io
-      #     username: ${{ github.repository_owner }}
-      #     password: ${{ secrets.GITHUB_TOKEN }}
+      # Login to github container registry
+      # https://github.com/docker/login-action
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v2.1.0
+        if: vars.DOCKERHUB_USER == ''
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       # Login against a Docker registry
       # https://github.com/docker/login-action
       - name: Login to Docker Hub
         uses: docker/login-action@v2.2.0
+        if: vars.DOCKERHUB_USER != ''
         with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ env.DOCKERHUB_USERNAME }}
-          password: ${{ env.DOCKERHUB_TOKEN }}
+          registry: docker.io
+          username: ${{ vars.DOCKERHUB_USER }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
           logout: true
 
       # Extract metadata (tags, labels) for Docker
       # https://github.com/docker/metadata-action
       - name: Extract Docker metadata
         id: meta
-        uses: docker/metadata-action@v4.4.0
+        uses: docker/metadata-action@v4.6.0
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          images: ${{ format('{0}/{1}', env.REGISTRY, env.IMAGE_REPOSITORY) }}
+          images: ${{ github.actor == 'nektos/act' && env.IMAGE_REPOSITORY || env.REGISTRY_IMAGE }}
           tags: |
-            type=raw,value=${{ matrix.from-version }},enable={{is_default_branch}},priority=900
+            type=sha,prefix=${{ matrix.from-version }}-,format=short,enable=${{ github.ref == 'refs/heads/main' }},priority=1000
+            type=raw,value=${{ matrix.from-version }},enable=${{ github.ref == 'refs/heads/main' }},priority=900
             type=raw,value=${{ matrix.from-version }}-${{ github.head_ref || github.ref_name }},priority=600
-            type=sha,prefix=${{ matrix.from-version }}-,format=short,enable={{is_default_branch}},priority=100
           flavor: |
-            latest=${{ github.ref == format('refs/heads/{0}', 'main') && matrix.from-version == '22.04' }}
+            latest=${{ github.ref == 'refs/heads/main' && matrix.from-version == '22.04' }}
           labels: |
-            org.opencontainers.image.authors=['${{ env.REPOSITORY_LINK }}','${{ github.actor }}']
+            org.opencontainers.image.authors='${{ env.REPOSITORY_LINK }},${{ github.actor }}'
             org.opencontainers.image.description=${{ github.event.repository.description }}
             org.opencontainers.image.documentation=${{ env.REPOSITORY_LINK }}
             org.opencontainers.image.revision=${{ env.SHA }}
             org.opencontainers.image.source=${{ github.repositoryUrl }}
-            org.opencontainers.image.title=${{ env.IMAGE_REPOSITORY }}:${{ github.head_ref || github.ref_name }}
+            org.opencontainers.image.title=${{ env.IMAGE_REPOSITORY }}:${{ matrix.from-version }}-${{ github.head_ref || github.ref_name }}
             org.opencontainers.image.url=${{ env.REPOSITORY_LINK }}/blob/${{ env.SHA }}/linux/${{ matrix.distro }}/Dockerfile
             org.opencontainers.image.vendor=${{ github.repository_owner }}
         env:
+          REGISTRY_IMAGE: ${{ format('{0}/{1}', env.REGISTRY, env.IMAGE_REPOSITORY) }}
           REPOSITORY_LINK: https://github.com/${{ github.repository }}
 
-      # Build and push Docker image with Buildx (don't push on PR)
-      # https://github.com/docker/build-push-action
-      - name: Build and push
-        id: build
-        uses: docker/build-push-action@v4
-        with:
-          context: .
-          # github-token for the repository context
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          file: ./linux/${{ matrix.distro }}/Dockerfile
-          platforms: linux/amd64,linux/arm64
-          labels: ${{ steps.meta.outputs.labels }}
-          tags: ${{ steps.meta.outputs.tags }}
-          build-args: |
-            FROM_IMAGE=buildpack-deps
-            FROM_VERSION_MAJOR=${{ matrix.from-version-major }}
-            FROM_VERSION_MINOR=${{ matrix.from-version-minor }}
-            FROM_FLAVOR=${{ matrix.from-flavor }}
-            DISTRO=${{ matrix.distro }}
-            CODENAME=${{ matrix.codename }}
-          # caching to speed up the build
-          cache-from: |
-            type=registry,ref=${{ env.REGISTRY_IMAGE }}:${{ matrix.from-version }}-${{ github.head_ref || github.ref_name }}
-            type=registry,ref=${{ env.REGISTRY_IMAGE }}:cache-${{ matrix.codename }}
-          # cache exporter doesn't work with docker driver
-          cache-to: |
-            type=registry,ref=${{ env.REGISTRY_IMAGE }}:cache-${{ matrix.codename }},mode=max
-          # this will give us some useful information about the build
-          provenance: mode=max
-          push: true
-          # outputs: type=image,name=${{ env.REGISTRY_IMAGE }}:${{ matrix.from-version }}-${{ github.head_ref || github.ref_name }},push=true
+      # # Build and push Docker image with Buildx (don't push on PR)
+      # # https://github.com/docker/build-push-action
+      # - name: Build and push
+      #   id: build
+      #   uses: docker/build-push-action@v4
+      #   with:
+      #     context: .
+      #     # github-token for the repository context
+      #     github-token: ${{ secrets.GITHUB_TOKEN }}
+      #     file: ./linux/${{ matrix.distro }}/Dockerfile
+      #     platforms: ${{ matrix.platforms }}
+      #     labels: ${{ steps.meta.outputs.labels }}
+      #     tags: ${{ steps.meta.outputs.tags }}
+      #     # tags: ${{ format('{0}:{1}-{2}', github.actor != 'nektos/act' && env.REGISTRY_IMAGE || env.IMAGE_REPOSITORY, matrix.from-version, github.head_ref || github.ref_name) }}
+      #     build-args: |
+      #       FROM_IMAGE=buildpack-deps
+      #       FROM_VERSION_MAJOR=${{ matrix.from-version-major }}
+      #       FROM_VERSION_MINOR=${{ matrix.from-version-minor }}
+      #       FROM_FLAVOR=${{ matrix.from-flavor }}
+      #       DISTRO=${{ matrix.distro }}
+      #       CODENAME=${{ matrix.codename }}
+      #     # caching to speed up the build
+      #     cache-from: |
+      #       ${{ format('type=registry,ref={0}:{1}', env.REGISTRY_IMAGE, matrix.from-version) }}
+      #       ${{ format('type=registry,ref={0}:cache-{1}', env.REGISTRY_IMAGE, matrix.codename) }}
+      #     # don't export cache on PR
+      #     cache-to: ${{ github.ref == 'refs/heads/main' && format('type=registry,ref={0}:cache-{1},mode=max', env.REGISTRY_IMAGE, matrix.codename) || '' }}
+      #     # this will give us some useful information about the build
+      #     provenance: mode=max
+      #     # push if not building with act
+      #     push: ${{ github.ref == 'refs/heads/main' }}
+      #     outputs: 'type=oci,dest=${{ env.PATH_TO_IMAGE }}'
+      #   env:
+      #     REGISTRY_IMAGE: ${{ format('{0}/{1}', env.REGISTRY, env.IMAGE_REPOSITORY) }}
+
+      # Build and push Docker images
+      - name: build image
+        run: >-
+          docker build
+          --tag ${{ steps.meta.outputs.tags }}
+          --file linux/${{ matrix.distro }}/Dockerfile
+          --cache-from ${{ format('type=registry,ref={0}:{1}', env.REGISTRY_IMAGE, matrix.from-version) }}
+          --cache-from ${{ format('type=registry,ref={0}:cache-{1}', env.REGISTRY_IMAGE, matrix.codename) }}
+          --build-arg FROM_IMAGE='buildpack-deps'
+          --build-arg FROM_VERSION_MAJOR='${{ matrix.from-version-major }}'
+          --build-arg FROM_VERSION_MINOR='${{ matrix.from-version-minor }}'
+          --build-arg FROM_FLAVOR='${{ matrix.from-flavor }}'
+          --build-arg DISTRO='${{ matrix.distro }}'
+          --build-arg CODENAME='${{ matrix.codename }}'
+          ${{ fromJson(env.IS_MAIN) && '--push' || format('--output type=docker,dest={0}',  env.PATH_TO_IMAGE) }}
+          --label org.opencontainers.image.authors='${{ env.REPOSITORY_LINK }}, ${{ github.actor }}'
+          --label org.opencontainers.image.description='${{ github.event.repository.description }}'
+          --label org.opencontainers.image.documentation='${{ env.REPOSITORY_LINK }}'
+          --label org.opencontainers.image.revision='${{ env.SHA }}'
+          --label org.opencontainers.image.source='${{ github.repositoryUrl }}'
+          --label org.opencontainers.image.title='${{ env.TITLE_TAG }}'
+          --label org.opencontainers.image.url='${{ env.REPOSITORY_LINK }}/blob/${{ env.SHA }}/linux/${{ matrix.distro }}/Dockerfile'
+          --label org.opencontainers.image.vendor='${{ github.repository_owner }}'
+          .
         env:
+          IS_MAIN: ${{ github.ref == 'refs/heads/main' }}
           REGISTRY_IMAGE: ${{ format('{0}/{1}', env.REGISTRY, env.IMAGE_REPOSITORY) }}
+          REPOSITORY_LINK: https://github.com/${{ github.repository }}
+          TITLE_TAG: ${{ format('{0}:{1}', env.IMAGE_REPOSITORY, github.head_ref || github.ref_name) }}
+
+      # Just for debugging
+      - name: inspect FROM_TAG
+        continue-on-error: true
+        run: docker inspect ${{ env.FROM_TAG }}
+      - name: inspect steps.meta.outputs.tags
+        continue-on-error: true
+        run: docker inspect ${{ steps.meta.outputs.tags }}
 
       # vulnerability scanning to verify PRs
       - name: Docker Scout
         id: docker-scout
-        continue-on-error: true
         uses: docker/scout-action@v0.23.4
         with:
+          # platform: linux/amd64
           command: sbom,compare
-          image: ${{ steps.meta.outputs.tags }}
-          to: ${{ format('{0}/{1}:{2}', env.REGISTRY, env.IMAGE_REPOSITORY, matrix.from-version) }}
-          organization: ${{ github.repository_owner }}
+          image: ${{ github.ref == 'refs/heads/main' && steps.meta.outputs.tags || env.PATH_TO_IMAGE }}
+          type: ${{ github.ref == 'refs/heads/main' && 'image' || 'archive' }}
+          to: ${{ env.TO_TAG }}
           ignore-unchanged: true
           only-severities: critical
-          write-comment: ${{ github.actor != 'nektos/act' }}
+          write-comment: ${{ github.event_name == 'pull_request' && github.actor != 'nektos/act' }}
           keep-previous-comments: true
-          summary: ${{ github.actor != 'nektos/act' }}
+          summary: ${{ github.event_name == 'pull_request' && github.actor != 'nektos/act' }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
+          organization: ${{ vars.DOCKERHUB_USER || github.repository_owner }}
 
   # ToDo: Move into a separate workflow and depend on ci and mega-linter
   approve-pr:
