@@ -22,8 +22,8 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        # platforms: ['linux/amd64,linux/arm64']
-        platforms: ${{ github.ref == 'refs/heads/main' && fromJson('["linux/amd64,linux/arm64"]') || fromJson(format('["{0}", "{1}"]', 'linux/amd64','linux/arm64')) }}
+        platforms: ['linux/amd64,linux/arm64']
+        # platforms: ${{ github.ref == 'refs/heads/main' && fromJson('["linux/amd64,linux/arm64"]') || fromJson(format('["{0}", "{1}"]', 'linux/amd64','linux/arm64')) }}
         from-version: ['22.04', '20.04']
         include:
           - from-version: '22.04'
@@ -52,7 +52,7 @@ jobs:
       # FROM_TAG: ${{ format('{0}/{1}/{2}-{3}:{4}-{5}', github.ref == 'refs/heads/main' && 'docker.io' || 'localhost:5000', vars.DOCKERHUB_USER, matrix.distro, matrix.from-flavor, matrix.from-version, github.head_ref || github.ref_name) }}
       TO_TAG: ${{ format('{0}/{1}/{2}-{3}:{4}', 'docker.io', vars.DOCKERHUB_USER, matrix.distro, matrix.from-flavor, matrix.from-version) }}
       REGISTRY: ${{ vars.DOCKERHUB_USER && 'docker.io' || 'ghcr.io' }}
-      PATH_TO_IMAGE: /tmp/${{ matrix.distro }}-${{ matrix.from-flavor }}-${{ matrix.from-version }}-${{ matrix.platforms }}.tar
+      PATH_TO_IMAGE: /tmp/${{ matrix.distro }}-${{ matrix.from-version }}.tar
     steps:
       - uses: actions/checkout@v4
 
@@ -153,9 +153,8 @@ jobs:
         id: docker-scout
         uses: docker/scout-action@v0.23.4
         with:
-          platform: ${{ matrix.platforms }}
+          platform: linux/amd64
           command: sbom,compare
-          # image: ${{ env.FROM_TAG }}
           image: ${{ env.PATH_TO_IMAGE}}
           type: archive
           to: ${{ env.TO_TAG }}
