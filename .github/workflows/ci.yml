@@ -156,7 +156,7 @@ jobs:
 
       - name: build image
         run: >-
-          docker buildx build
+          docker build
           --tag ${{ vars.DOCKERHUB_USER }}/${{ env.IMAGE_NAME }}:${{ matrix.from-version }}-${{ github.head_ref || github.ref_name }}
           --file linux/${{ matrix.distro }}/Dockerfile
           --load
