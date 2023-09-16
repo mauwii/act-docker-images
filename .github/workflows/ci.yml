@@ -63,10 +63,10 @@ jobs:
           deleteAndroid: 'true'
 
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@v2
+        uses: docker/setup-qemu-action@v3.0.0
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2.10.0
+        uses: docker/setup-buildx-action@v3.0.0
         with:
           driver: docker-container
           driver-opts: image=moby/buildkit:v0.12.2,network=host
@@ -78,7 +78,7 @@ jobs:
       # Login to github container registry
       # https://github.com/docker/login-action
       - name: Login to GitHub Container Registry
-        uses: docker/login-action@v2.1.0
+        uses: docker/login-action@v3.0.0
         if: vars.DOCKERHUB_USER == ''
         with:
           registry: ghcr.io
@@ -88,7 +88,7 @@ jobs:
       # Login against a Docker registry
       # https://github.com/docker/login-action
       - name: Login to Docker Hub
-        uses: docker/login-action@v2.2.0
+        uses: docker/login-action@v3.0.0
         if: vars.DOCKERHUB_USER != ''
         with:
           registry: docker.io
@@ -100,7 +100,7 @@ jobs:
       # https://github.com/docker/metadata-action
       - name: Extract Docker metadata
         id: meta
-        uses: docker/metadata-action@v4.6.0
+        uses: docker/metadata-action@v5.0.0
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           images: ${{ github.actor == 'nektos/act' && env.IMAGE_REPOSITORY || env.REGISTRY_IMAGE }}
@@ -161,8 +161,8 @@ jobs:
       # Build and push Docker images
       - name: build image
         run: >-
-          docker build
-          --tag ${{ steps.meta.outputs.tags }}
+          while IFS='' read -r line; do tags+=(-t "$line"); done < <(echo ${{ steps.meta.outputs.tags }})
+          && docker build "${tags[@]}"
           --file linux/${{ matrix.distro }}/Dockerfile
           --cache-from ${{ format('type=registry,ref={0}:{1}', env.REGISTRY_IMAGE, matrix.from-version) }}
           --cache-from ${{ format('type=registry,ref={0}:cache-{1}', env.REGISTRY_IMAGE, matrix.codename) }}
