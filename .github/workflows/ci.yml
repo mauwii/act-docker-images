@@ -38,17 +38,12 @@ jobs:
             distro: 'ubuntu'
             codename: 'focal'
             from-flavor: 'act'
-    services:
-      registry:
-        image: registry:2
-        ports:
-          - 5000:5000
     env:
       CACHE_FROM_REGISTRY: docker.io
       IMAGE_NAME: ${{ format('{0}-{1}', matrix.distro, matrix.from-flavor) }}
       IMAGE_REPOSITORY: ${{ format('{0}/{1}-{2}', vars.DOCKERHUB_USER || github.repository_owner, matrix.distro, matrix.from-flavor) }}
       SHA: ${{ github.event.pull_request.head.sha || github.event.after }}
-      REGISTRY: ${{ github.ref != 'refs/heads/main' && 'localhost:5000' || (vars.DOCKERHUB_USER && 'docker.io' || 'ghcr.io') }}
+      REGISTRY: ${{ vars.DOCKERHUB_USER && 'docker.io' || 'ghcr.io' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -120,9 +115,9 @@ jobs:
       - name: build image
         run: >-
           docker build
-          --tag ${{ vars.DOCKERHUB_USER }}/${{ env.IMAGE_NAME }}:${{ matrix.from-version }}-${{ github.head_ref || github.ref_name }}
+          --tag ${{ env.IMAGE_NAME }}:${{ matrix.from-version }}-${{ github.head_ref || github.ref_name }}
           --file linux/${{ matrix.distro }}/Dockerfile
-          --load
+          ${{ github.ref == 'refs/heads/main' && '--push' || '--load' }}
           --cache-from ${{ format('type=registry,ref={0}:{1}', env.CACHE_FROM_REGISTRY_IMAGE, matrix.from-version) }}
           --cache-from ${{ format('type=registry,ref={0}:cache-{1}', env.CACHE_FROM_REGISTRY_IMAGE, matrix.codename) }}
           --build-arg FROM_IMAGE=buildpack-deps
@@ -138,7 +133,7 @@ jobs:
 
       - name: inspect image
         continue-on-error: true
-        run: docker inspect ${{ vars.DOCKERHUB_USER }}/${{ env.IMAGE_NAME }}:${{ matrix.from-version }}-${{ github.head_ref || github.ref_name }}
+        run: docker inspect ${{ env.IMAGE_NAME }}:${{ matrix.from-version }}-${{ github.head_ref || github.ref_name }}
 
       # vulnerability scanning to verify PRs
       - name: Docker Scout
@@ -146,8 +141,8 @@ jobs:
         continue-on-error: true
         uses: docker/scout-action@v0.23.4
         with:
-          command: sbom,compare
-          image: ${{ vars.DOCKERHUB_USER }}/${{ env.IMAGE_NAME }}:${{ matrix.from-version }}-${{ github.head_ref || github.ref_name }}
+          command: ${{github.ref == '/refs/heads/main' && 'sbom,' }}compare
+          image: ${{ env.IMAGE_NAME }}:${{ matrix.from-version }}-${{ github.head_ref || github.ref_name }}
           # image: ${{ github.actor == 'nektos/act' && env.IMAGE || env.REGISTRY_IMAGE }}
           to: ${{ format('{0}/{1}:{2}', env.CACHE_FROM_REGISTRY, env.IMAGE_REPOSITORY, matrix.from-version) }}
           organization: ${{ vars.DOCKERHUB_USER }}
