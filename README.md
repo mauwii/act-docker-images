@@ -9,8 +9,8 @@
 [![Github last-commit](https://badgen.net/github/last-commit/mauwii/act-docker-images/?color=blue&icon=github&label=last-commit)][githubCommits]
 
 [![ci](https://github.com/mauwii/act-docker-images/actions/workflows/ci.yml/badge.svg?branch=main&event=push)][workflowCi]
-[![Docker-Hub description](https://github.com/mauwii/act-docker-images/actions/workflows/dockerhub-description.yml/badge.svg?branch=main)][workflowDhDesc]
 [![MegaLinter](https://github.com/mauwii/act-docker-images/workflows/MegaLinter/badge.svg?branch=main&event=push)][workflowMegaLinter]
+[![Docker-Hub description](https://github.com/mauwii/act-docker-images/actions/workflows/dockerhub-description.yml/badge.svg?branch=main)][workflowDhDesc]
 
 ## ⚠️ Heavily under construction... ⚠️
 
