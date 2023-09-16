@@ -146,7 +146,7 @@ jobs:
           # this will give us some useful information about the build
           provenance: mode=max
           # push if not building with act
-          push: ${{ github.ref == 'refs/heads/main' }}
+          push: ${{ github.actor != 'nektos/act' }}
           # load: ${{ github.ref != 'refs/heads/main' }}
           outputs: type=image,name=${{ steps.meta.outputs.tags }}
         env:
