@@ -209,16 +209,24 @@ RUN apt-get -y update \
 RUN curl -fsSL https://raw.githubusercontent.com/tj/n/master/bin/n -o ~/n \
     && defaultVersion=$(jq -r '.node.default' ${TOOLSET}) \
     && bash ~/n "${defaultVersion}" \
+    && rm -rf ~/n \
+    && npm install -g npm@latest \
     && while IFS='' read -r node_module; do echo "installing ${node_module}" && npm install -g "${node_module}"; done < <(jq -r '.node_modules[].name' ${TOOLSET}) \
     && echo "Creating the symlink for [now] command to vercel CLI" && ln -s /usr/local/bin/vercel /usr/local/bin/now \
     && chmod -R 777 /usr/local/lib/node_modules \
-    && chmod -R 777 /usr/local/bin \
-    && rm -rf ~/n
+    && chmod -R 777 /usr/local/bin
 
 # Trust PSGallery and install Powershell-/Azure Modules
 RUN pwsh -NonInteractive -Command "Set-PSRepository -Name PSGallery -InstallationPolicy Trusted" \
     && while IFS='' read -r pwshModule; do echo "installing ${pwshModule}" && pwsh -NonInteractive -Command "Install-Module -Name ${pwshModule} -Scope AllUsers -Repository PSGallery"; done < <(jq -r '.powershellModules[].name' ${TOOLSET}) \
     && while IFS='' read -r azVersion; do echo "installing Az ${azVersion}" && pwsh -NonInteractive -Command "Install-Module -Name Az -RequiredVersion ${azVersion} -Scope AllUsers -Repository PSGallery"; done < <(jq -r '.azureModules[].versions[]' ${TOOLSET})
+
+# run all available apt-get upgrades
+RUN apt-get -y update \
+    && apt-get -y upgrade \
+    && apt-get clean \
+    && rm -rf /etc/apt/sources.list.d/* \
+    && rm -rf /var/lib/apt/lists/*
 
 # cleanup step
 RUN apt-get -y clean \
