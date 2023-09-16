@@ -160,7 +160,7 @@ jobs:
       # Build and push Docker images
       - name: build image
         run: >-
-          while IFS='' read -r line; do tags+=(-t "$line"); done < <(echo $DOCKER_METADATA_OUTPUT_JSON | jq -r '.tags[]')
+          while IFS='' read -r line; do tags+=(-t "${line}"); done < <(echo "${DOCKER_METADATA_OUTPUT_JSON}" | jq -r '.tags[]')
           && docker build "${tags[@]}"
           --file linux/${{ matrix.distro }}/Dockerfile
           --cache-from ${{ format('type=registry,ref={0}:{1}', env.REGISTRY_IMAGE, matrix.from-version) }}
