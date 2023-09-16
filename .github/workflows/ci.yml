@@ -23,8 +23,8 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        platforms: ['linux/amd64,linux/arm64']
-        # platforms: ${{ github.ref == 'refs/heads/main' && fromJson('["linux/amd64,linux/arm64"]') || fromJson(format('["{0}", "{1}"]', 'linux/amd64','linux/arm64')) }}
+        # platforms: ['linux/amd64,linux/arm64']
+        platforms: ${{ github.event_name == 'pull_request' && fromJson(format('["{0}", "{1}"]', 'linux/amd64','linux/arm64')) || fromJson('["linux/amd64,linux/arm64"]') }}
         from-version: ['22.04', '20.04']
         include:
           - from-version: '22.04'
