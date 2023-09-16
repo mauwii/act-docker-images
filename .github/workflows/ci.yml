@@ -39,11 +39,11 @@ jobs:
             codename: 'focal'
             from-flavor: 'act'
     env:
-      CACHE_FROM_REGISTRY: docker.io
       IMAGE_NAME: ${{ format('{0}-{1}', matrix.distro, matrix.from-flavor) }}
       IMAGE_REPOSITORY: ${{ format('{0}/{1}-{2}', vars.DOCKERHUB_USER || github.repository_owner, matrix.distro, matrix.from-flavor) }}
       SHA: ${{ github.event.pull_request.head.sha || github.event.after }}
-      IMAGE_TAG: ${{ format('{0}-{1}:{2}-{3}', matrix.distro, matrix.from-flavor, matrix.from-version, github.head_ref || github.ref_name) }}
+      FROM_TAG: ${{ format('{0}/{1}/{2}-{3}:{4}-{5}', 'docker.io', vars.DOCKERHUB_USER, matrix.distro, matrix.from-flavor, matrix.from-version, github.head_ref || github.ref_name) }}
+      TO_TAG: ${{ format('{0}/{1}/{2}-{3}:{4}', 'docker.io', vars.DOCKERHUB_USER, matrix.distro, matrix.from-flavor, matrix.from-version) }}
       REGISTRY: ${{ vars.DOCKERHUB_USER && 'docker.io' || 'ghcr.io' }}
     steps:
       - uses: actions/checkout@v4
@@ -116,11 +116,11 @@ jobs:
       - name: build image
         run: >-
           docker build
-          --tag ${{ env.IMAGE_TAG }}
+          --tag ${{ env.FROM_TAG }}
           --file linux/${{ matrix.distro }}/Dockerfile
           ${{ github.ref == 'refs/heads/main' && '--push' || '--load' }}
-          --cache-from ${{ format('type=registry,ref={0}:{1}', env.CACHE_FROM_REGISTRY_IMAGE, matrix.from-version) }}
-          --cache-from ${{ format('type=registry,ref={0}:cache-{1}', env.CACHE_FROM_REGISTRY_IMAGE, matrix.codename) }}
+          --cache-from ${{ format('type=registry,ref={0}:{1}', env.REGISTRY_IMAGE, matrix.from-version) }}
+          --cache-from ${{ format('type=registry,ref={0}:cache-{1}', env.REGISTRY_IMAGE, matrix.codename) }}
           --build-arg FROM_IMAGE=buildpack-deps
           --build-arg FROM_VERSION_MAJOR=${{ matrix.from-version-major }}
           --build-arg FROM_VERSION_MINOR=${{ matrix.from-version-minor }}
@@ -130,11 +130,11 @@ jobs:
           .
         env:
           REGISTRY_IMAGE: ${{ format('{0}/{1}', env.REGISTRY, env.IMAGE_REPOSITORY) }}
-          CACHE_FROM_REGISTRY_IMAGE: ${{ format('{0}/{1}', env.CACHE_FROM_REGISTRY, env.IMAGE_REPOSITORY) }}
+          CACHE_FROM_REGISTRY_IMAGE: ${{ format('{0}/{1}', env.REGISTRY, env.IMAGE_REPOSITORY) }}
 
       - name: inspect image
         continue-on-error: true
-        run: docker inspect ${{ env.IMAGE_TAG }}
+        run: docker inspect ${{ env.FROM_TAG }}
 
       # vulnerability scanning to verify PRs
       - name: Docker Scout
@@ -143,10 +143,8 @@ jobs:
         uses: docker/scout-action@v0.23.4
         with:
           command: ${{github.ref == '/refs/heads/main' && 'sbom' || 'compare' }}
-          image: ${{ env.IMAGE_TAG }}
-          # image: ${{ env.IMAGE_NAME }}:${{ matrix.from-version }}-${{ github.head_ref || github.ref_name }}
-          # image: ${{ github.actor == 'nektos/act' && env.IMAGE || env.REGISTRY_IMAGE }}
-          to: ${{ format('{0}/{1}:{2}', env.CACHE_FROM_REGISTRY, env.IMAGE_REPOSITORY, matrix.from-version) }}
+          image: ${{ env.FROM_TAG }}
+          to: ${{ env.TO_TAG }}
           organization: ${{ vars.DOCKERHUB_USER }}
           ignore-unchanged: true
           only-severities: critical
@@ -154,9 +152,6 @@ jobs:
           keep-previous-comments: true
           summary: ${{ github.actor != 'nektos/act' }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
-        env:
-          IMAGE: ${{ format('{0}:{1}-{2}', env.IMAGE_REPOSITORY, matrix.from-version, github.head_ref || github.ref_name) }}
-          REGISTRY_IMAGE: ${{ format('{0}/{1}:{2}-{3}', env.REGISTRY, env.IMAGE_REPOSITORY, matrix.from-version, github.head_ref || github.ref_name) }}
 
   # ToDo: Move into a separate workflow and depend on ci and mega-linter
   approve-pr:
