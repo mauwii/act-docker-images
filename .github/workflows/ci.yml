@@ -117,19 +117,6 @@ jobs:
           REGISTRY_IMAGE: ${{ format('{0}/{1}', env.REGISTRY, env.IMAGE_REPOSITORY) }}
           REPOSITORY_LINK: https://github.com/${{ github.repository }}
 
-      - name: build image
-        run: >-
-          docker build
-          -t ${{ env.REGISTRY }}/${{ vars.DOCKERHUB_USER }}/${{ env.IMAGE_NAME }}:${{ matrix.from-version }}-${{ github.head_ref || github.ref_name }}
-          -f linux/${{ matrix.distro }}/Dockerfile
-          --load
-          --cache-from ${{ format('type=registry,ref={0}:{1}', env.CACHE_FROM_REGISTRY_IMAGE, matrix.from-version) }}
-          --cache-from ${{ format('type=registry,ref={0}:cache-{1}', env.CACHE_FROM_REGISTRY_IMAGE, matrix.codename) }}
-          .
-        env:
-          REGISTRY_IMAGE: ${{ format('{0}/{1}', env.REGISTRY, env.IMAGE_REPOSITORY) }}
-          CACHE_FROM_REGISTRY_IMAGE: ${{ format('{0}/{1}', env.CACHE_FROM_REGISTRY, env.IMAGE_REPOSITORY) }}
-
       # # Build and push Docker image with Buildx (don't push on PR)
       # # https://github.com/docker/build-push-action
       # - name: Build and push
@@ -167,6 +154,26 @@ jobs:
       #     REGISTRY_IMAGE: ${{ format('{0}/{1}', env.REGISTRY, env.IMAGE_REPOSITORY) }}
       #     CACHE_FROM_REGISTRY_IMAGE: ${{ format('{0}/{1}', env.CACHE_FROM_REGISTRY, env.IMAGE_REPOSITORY) }}
 
+      - name: build image
+        run: >-
+          docker buildx build
+          --tag ${{ vars.DOCKERHUB_USER }}/${{ env.IMAGE_NAME }}:${{ matrix.from-version }}-${{ github.head_ref || github.ref_name }}
+          --file linux/${{ matrix.distro }}/Dockerfile
+          --load
+          --cache-from ${{ format('type=registry,ref={0}:{1}', env.CACHE_FROM_REGISTRY_IMAGE, matrix.from-version) }}
+          --cache-from ${{ format('type=registry,ref={0}:cache-{1}', env.CACHE_FROM_REGISTRY_IMAGE, matrix.codename) }}
+          --build-arg FROM_IMAGE=buildpack-deps
+          --build-arg FROM_VERSION_MAJOR=${{ matrix.from-version-major }}
+          --build-arg FROM_VERSION_MINOR=${{ matrix.from-version-minor }}
+          --build-arg FROM_FLAVOR=${{ matrix.from-flavor }}
+          --build-arg DISTRO=${{ matrix.distro }}
+          --build-arg CODENAME=${{ matrix.codename }}
+          --attest type=sbom
+          .
+        env:
+          REGISTRY_IMAGE: ${{ format('{0}/{1}', env.REGISTRY, env.IMAGE_REPOSITORY) }}
+          CACHE_FROM_REGISTRY_IMAGE: ${{ format('{0}/{1}', env.CACHE_FROM_REGISTRY, env.IMAGE_REPOSITORY) }}
+
       - name: inspect image
         continue-on-error: true
         run: docker inspect ${{ env.REGISTRY }}/${{ vars.DOCKERHUB_USER }}/${{ env.IMAGE_NAME }}:${{ matrix.from-version }}-${{ github.head_ref || github.ref_name }}
@@ -193,7 +200,7 @@ jobs:
         uses: docker/scout-action@v0.23.4
         with:
           command: sbom,compare
-          image: ${{ steps.meta.outputs.tags }}
+          image: ${{ vars.DOCKERHUB_USER }}/${{ env.IMAGE_NAME }}:${{ matrix.from-version }}-${{ github.head_ref || github.ref_name }}
           # image: ${{ github.actor == 'nektos/act' && env.IMAGE || env.REGISTRY_IMAGE }}
           to: ${{ format('{0}/{1}:{2}', env.CACHE_FROM_REGISTRY, env.IMAGE_REPOSITORY, matrix.from-version) }}
           organization: ${{ vars.DOCKERHUB_USER }}

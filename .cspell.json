@@ -115,7 +115,5 @@
     "zstd",
     "zsync"
   ],
-  "enableFiletypes": [
-    "github-actions-workflow"
-  ]
+  "enableFiletypes": ["github-actions-workflow"]
 }
