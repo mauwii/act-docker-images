@@ -68,9 +68,12 @@ RUN bash -c "$(curl -fsSL https://raw.githubusercontent.com/ilikenwf/apt-fast/ma
     && rm -rf /var/lib/apt/lists/*
 
 # Install current version of git
+# hadolint ignore=SC2035
 RUN add-apt-repository -y ppa:git-core/ppa \
     && apt-get -y update \
-    && apt-get -y install --no-install-recommends git \
+    && apt-get -y install --no-install-recommends \
+        git \
+    && git config --global safe.directory * \
     && apt-get clean \
     && rm -rf /etc/apt/sources.list.d/* \
     && rm -rf /var/lib/apt/lists/*

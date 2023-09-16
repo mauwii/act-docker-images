@@ -192,17 +192,18 @@ jobs:
       - name: Docker Scout
         id: docker-scout
         uses: docker/scout-action@v0.23.4
+        if: github.event_name == 'pull_request'
         with:
           # platform: linux/amd64
           command: sbom,compare
-          image: ${{ github.ref == 'refs/heads/main' && steps.meta.outputs.tags || env.PATH_TO_IMAGE }}
-          type: ${{ github.ref == 'refs/heads/main' && 'image' || 'archive' }}
+          image: ${{ env.PATH_TO_IMAGE }}
+          type: archive
           to: ${{ env.TO_TAG }}
           ignore-unchanged: true
           only-severities: critical
-          write-comment: ${{ github.event_name == 'pull_request' && github.actor != 'nektos/act' }}
+          write-comment: ${{ github.actor != 'nektos/act' }}
           keep-previous-comments: true
-          summary: ${{ github.event_name == 'pull_request' && github.actor != 'nektos/act' }}
+          summary: ${{ github.actor != 'nektos/act' }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
           organization: ${{ vars.DOCKERHUB_USER || github.repository_owner }}
 
