@@ -222,6 +222,7 @@ RUN pwsh -NonInteractive -Command "Set-PSRepository -Name PSGallery -Installatio
     && while IFS='' read -r azVersion; do echo "installing Az ${azVersion}" && pwsh -NonInteractive -Command "Install-Module -Name Az -RequiredVersion ${azVersion} -Scope AllUsers -Repository PSGallery"; done < <(jq -r '.azureModules[].versions[]' ${TOOLSET})
 
 # run all available apt-get upgrades
+# kics-scan ignore-block
 RUN apt-get -y update \
     && apt-get -y upgrade \
     && apt-get clean \
