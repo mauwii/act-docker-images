@@ -162,7 +162,7 @@ jobs:
       - name: build image
         run: >-
           docker build
-          --tag ${{ env.FROM_TAG }}
+          --tag ${{ steps.meta.outputs.tags }}
           --file linux/${{ matrix.distro }}/Dockerfile
           --cache-from ${{ format('type=registry,ref={0}:{1}', env.REGISTRY_IMAGE, matrix.from-version) }}
           --cache-from ${{ format('type=registry,ref={0}:cache-{1}', env.REGISTRY_IMAGE, matrix.codename) }}
@@ -187,9 +187,12 @@ jobs:
           REPOSITORY_LINK: https://github.com/${{ github.repository }}
 
       # Just for debugging
-      - name: inspect image
+      - name: inspect FROM_TAG
         continue-on-error: true
         run: docker inspect ${{ env.FROM_TAG }}
+      - name: inspect steps.meta.outputs.tags
+        continue-on-error: true
+        run: docker inspect ${{ steps.meta.outputs.tags }}
 
       # vulnerability scanning to verify PRs
       - name: Docker Scout
@@ -198,14 +201,14 @@ jobs:
         with:
           # platform: linux/amd64
           command: sbom,compare
-          image: ${{ env.PATH_TO_IMAGE}}
-          type: archive
+          image: ${{ github.ref == 'refs/heads/main' && steps.meta.outputs.tags || env.PATH_TO_IMAGE }}
+          type: ${{ github.ref == 'refs/heads/main' && 'image' || 'archive' }}
           to: ${{ env.TO_TAG }}
           ignore-unchanged: true
           only-severities: critical
-          write-comment: ${{ github.actor != 'nektos/act' }}
+          write-comment: ${{ github.event_name == 'pull_request' && github.actor != 'nektos/act' }}
           keep-previous-comments: true
-          summary: ${{ github.actor != 'nektos/act' }}
+          summary: ${{ github.event_name == 'pull_request' && github.actor != 'nektos/act' }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
           organization: ${{ vars.DOCKERHUB_USER || github.repository_owner }}
 
