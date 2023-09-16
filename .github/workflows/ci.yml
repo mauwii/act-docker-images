@@ -163,6 +163,7 @@ jobs:
           while IFS='' read -r line; do tags+=(-t "${line}"); done < <(echo "${DOCKER_METADATA_OUTPUT_JSON}" | jq -r '.tags[]')
           && docker build "${tags[@]}"
           --file linux/${{ matrix.distro }}/Dockerfile
+          --platform ${{ matrix.platforms }}
           --cache-from ${{ format('type=registry,ref={0}:{1}', env.REGISTRY_IMAGE, matrix.from-version) }}
           --cache-from ${{ format('type=registry,ref={0}:cache-{1}', env.REGISTRY_IMAGE, matrix.codename) }}
           --build-arg FROM_IMAGE='buildpack-deps'
