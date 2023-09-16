@@ -72,9 +72,6 @@ jobs:
           use: true
           cleanup: true
           platforms: ${{ matrix.platforms }}
-          config-inline: |
-            [registry."localhost:5000"]
-              insecure = true
 
       # Login to github container registry
       # https://github.com/docker/login-action
@@ -162,6 +159,7 @@ jobs:
           keep-previous-comments: true
           summary: ${{ github.actor != 'nektos/act' }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
+          organization: ${{ vars.DOCKERHUB_USER || github.repository_owner }}
 
   # ToDo: Move into a separate workflow and depend on ci and mega-linter
   approve-pr:
