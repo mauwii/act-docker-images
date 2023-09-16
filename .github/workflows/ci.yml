@@ -22,7 +22,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        platforms: ['linux/amd64,linux/arm64']
+        platforms: ${{ github.ref != 'refs/heads/main' && fromJson(format('["{0}", "{1}"]', 'linux/amd64','linux/arm64')) || fromJson('["linux/amd64,linux/arm64"]') }}
         from-version: ['22.04', '20.04']
         include:
           - from-version: '22.04'
@@ -146,9 +146,9 @@ jobs:
           # this will give us some useful information about the build
           provenance: mode=max
           # push if not building with act
-          push: ${{ github.actor != 'nektos/act' }}
-          # load: ${{ github.ref != 'refs/heads/main' }}
-          outputs: type=image,name=${{ steps.meta.outputs.tags }}
+          push: ${{ github.ref == 'refs/heads/main' }}
+          load: ${{ github.ref != 'refs/heads/main' }}
+          # outputs: type=image,name=${{ steps.meta.outputs.tags }}
         env:
           REGISTRY_IMAGE: ${{ format('{0}/{1}', env.REGISTRY, env.IMAGE_REPOSITORY) }}
           CACHE_FROM_REGISTRY_IMAGE: ${{ format('{0}/{1}', env.CACHE_FROM_REGISTRY, env.IMAGE_REPOSITORY) }}
