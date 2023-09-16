@@ -168,7 +168,6 @@ jobs:
           --build-arg FROM_FLAVOR=${{ matrix.from-flavor }}
           --build-arg DISTRO=${{ matrix.distro }}
           --build-arg CODENAME=${{ matrix.codename }}
-          --attest type=sbom
           .
         env:
           REGISTRY_IMAGE: ${{ format('{0}/{1}', env.REGISTRY, env.IMAGE_REPOSITORY) }}
