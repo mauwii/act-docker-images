@@ -48,9 +48,7 @@ jobs:
       BUILDKIT_PROGRESS: plain
       IMAGE_NAME: ${{ format('{0}-{1}', matrix.distro, matrix.from-flavor) }}
       IMAGE_REPOSITORY: ${{ format('{0}/{1}-{2}', vars.DOCKERHUB_USER || github.repository_owner, matrix.distro, matrix.from-flavor) }}
-      SHA: ${{ github.event.pull_request.head.sha || github.event.after }}
-      FROM_TAG: ${{ format('{0}-{1}:{2}-{3}', matrix.distro, matrix.from-flavor, matrix.from-version, github.head_ref || github.ref_name) }}
-      # FROM_TAG: ${{ format('{0}/{1}/{2}-{3}:{4}-{5}', github.ref == 'refs/heads/main' && 'docker.io' || 'localhost:5000', vars.DOCKERHUB_USER, matrix.distro, matrix.from-flavor, matrix.from-version, github.head_ref || github.ref_name) }}
+      SHA: ${{ github.event.pull_request.head.sha || github.event.after || github.sha }}
       TO_TAG: ${{ format('{0}/{1}/{2}-{3}:{4}', 'docker.io', vars.DOCKERHUB_USER, matrix.distro, matrix.from-flavor, matrix.from-version) }}
       REGISTRY: ${{ vars.DOCKERHUB_USER && 'docker.io' || 'ghcr.io' }}
       PATH_TO_IMAGE: /tmp/${{ matrix.distro }}-${{ matrix.from-version }}.tar
@@ -162,7 +160,7 @@ jobs:
       # Build and push Docker images
       - name: build image
         run: >-
-          while IFS='' read -r line; do tags+=(-t "$line"); done < <(echo ${{ steps.meta.outputs.tags }})
+          while IFS='' read -r line; do tags+=(-t "${line}"); done < <(echo "${DOCKER_METADATA_OUTPUT_JSON}" | jq -r '.tags[]')
           && docker build "${tags[@]}"
           --file linux/${{ matrix.distro }}/Dockerfile
           --cache-from ${{ format('type=registry,ref={0}:{1}', env.REGISTRY_IMAGE, matrix.from-version) }}
@@ -173,8 +171,8 @@ jobs:
           --build-arg FROM_FLAVOR='${{ matrix.from-flavor }}'
           --build-arg DISTRO='${{ matrix.distro }}'
           --build-arg CODENAME='${{ matrix.codename }}'
-          ${{ fromJson(env.IS_MAIN) && '--push' || format('--output type=docker,dest={0}',  env.PATH_TO_IMAGE) }}
-          --label org.opencontainers.image.authors='${{ env.REPOSITORY_LINK }}, ${{ github.actor }}'
+          ${{ fromJson(env.IS_MAIN) && '--output=type=registry,push=true' || format('--output=type=docker,dest={0}',  env.PATH_TO_IMAGE) }}
+          --label org.opencontainers.image.authors='${{ env.TAG_AUTHORS }}'
           --label org.opencontainers.image.description='${{ github.event.repository.description }}'
           --label org.opencontainers.image.documentation='${{ env.REPOSITORY_LINK }}'
           --label org.opencontainers.image.revision='${{ env.SHA }}'
@@ -187,15 +185,8 @@ jobs:
           IS_MAIN: ${{ github.ref == 'refs/heads/main' }}
           REGISTRY_IMAGE: ${{ format('{0}/{1}', env.REGISTRY, env.IMAGE_REPOSITORY) }}
           REPOSITORY_LINK: https://github.com/${{ github.repository }}
+          TAG_AUTHORS: ${{ format('{0},{1}', env.REPOSITORY_LINK, github.triggering_actor) }}
           TITLE_TAG: ${{ format('{0}:{1}', env.IMAGE_REPOSITORY, github.head_ref || github.ref_name) }}
-
-      # Just for debugging
-      - name: inspect FROM_TAG
-        continue-on-error: true
-        run: docker inspect ${{ env.FROM_TAG }}
-      - name: inspect steps.meta.outputs.tags
-        continue-on-error: true
-        run: docker inspect ${{ steps.meta.outputs.tags }}
 
       # vulnerability scanning to verify PRs
       - name: Docker Scout
@@ -232,36 +223,10 @@ jobs:
           PR_URL: ${{github.event.pull_request.html_url}}
           GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
 
-      # # Disabling this since I enabled the auto-merge option for the repo
-      # - name: Merge PR
-      #   run: gh pr merge --auto --merge "$PR_URL"
-      #   env:
-      #     PR_URL: ${{github.event.pull_request.html_url}}
-      #     GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
-
-      # # Disabling this since github-actions-cache is currently not used
-      # - name: Clean cache
-      #   run: |
-      #     gh extension install actions/gh-actions-cache
-
-      #     REPO=${{ github.repository }}
-      #     BRANCH=refs/heads/${{ github.head_ref }}
-
-      #     echo "Fetching list of cache key"
-      #     cacheKeysForPR=$(gh actions-cache list -R "${REPO}" -B "${BRANCH}" | cut -f 1)
-
-      #     if [ -n "$cacheKeysForPR" ]; then
-      #         ## Setting this to not fail the workflow while deleting cache keys.
-      #         set +e
-      #         echo "Deleting caches..."
-      #         for cacheKey in $cacheKeysForPR; do
-      #             gh actions-cache delete "${cacheKey}" -R "${REPO}" -B "${BRANCH}" --confirm
-      #         done
-      #         echo "Done"
-      #         ## Restore the fail on error.
-      #         set -e
-      #     else
-      #         echo "No cache keys found for this PR"
-      #     fi
-      #   env:
-      #     GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # auto merge dependabot PRs
+      - name: Merge DependaBot
+        if: github.actor == 'dependabot[bot]' && github.event_name == 'pull_request' &&  needs.build.result == 'success'
+        run: gh pr merge --auto --merge "$PR_URL"
+        env:
+          PR_URL: ${{github.event.pull_request.html_url}}
+          GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
