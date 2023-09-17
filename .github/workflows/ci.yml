@@ -159,7 +159,9 @@ jobs:
       - name: get arch
         id: cache-arch
         if: github.event_name == 'pull_request'
-        run: printf "CACHE_ARCH=%s\n" "$(docker run --platform ${{ matrix.platforms }} --rm -t ubuntu:22.04 dpkg --print-architecture)" >> "$GITHUB_OUTPUT"
+        run: |
+          docker pull ubuntu:22.04
+          printf "CACHE_ARCH=%s\n" "$(docker run --platform ${{ matrix.platforms }} --rm ubuntu:22.04 dpkg --print-architecture)" >> "$GITHUB_OUTPUT"
 
       # Build and push Docker images
       - name: build image
