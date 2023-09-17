@@ -166,6 +166,7 @@ jobs:
           --platform ${{ matrix.platforms }}
           --cache-from ${{ format('type=registry,ref={0}:{1}', env.REGISTRY_IMAGE, matrix.from-version) }}
           --cache-from ${{ format('type=registry,ref={0}:cache-{1}', env.REGISTRY_IMAGE, matrix.codename) }}
+          --cache-to ${{ format('type=registry,ref={0}:cache-{1},mode=max', env.REGISTRY_IMAGE, matrix.codename) }}
           --build-arg FROM_IMAGE='buildpack-deps'
           --build-arg FROM_VERSION_MAJOR='${{ matrix.from-version-major }}'
           --build-arg FROM_VERSION_MINOR='${{ matrix.from-version-minor }}'

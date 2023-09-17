@@ -35,6 +35,7 @@
     "https://json.schemastore.org/github-action.json": [
       "action.yaml",
       "action.yml"
-    ]
+    ],
+    "https://json.schemastore.org/github-issue-config.json": ".github/ISSUE_TEMPLATE/config.yml"
   }
 }

@@ -105,16 +105,18 @@ RUN echo "deb https://packages.microsoft.com/ubuntu/$(lsb_release -rs)/prod $(ls
 # Set .NET related environment variables
 ENV \
     DOTNET_ROOT=${AGENT_TOOLSDIRECTORY}/dotnet \
-    PATH=${AGENT_TOOLSDIRECTORY}/dotnet:${PATH} \
+    PATH=${HOME}/.dotnet/tools:${AGENT_TOOLSDIRECTORY}/dotnet:${PATH} \
     DOTNET_GENERATE_ASPNET_CERTIFICATE=false \
     DOTNET_NOLOGO=true \
     DOTNET_SDK_VERSION=6.0.413 \
     DOTNET_USE_POLLING_FILE_WATCHER=true \
     NUGET_XMLDOC_MODE=skip \
-    DOTNET_CLI_TELEMETRY_OPTOUT=1
+    DOTNET_CLI_TELEMETRY_OPTOUT=1 \
+    DOTNET_MULTILEVEL_LOOKUP=0
 
 # install .NET SDK LTS
-RUN export fromVersion=${FROM_VERSION} \
+RUN printf "Package: *net*\nPin: origin packages.microsoft.com\nPin-Priority: 1001\n" >/etc/apt/preferences.d/dotnet \
+    && export fromVersion=${FROM_VERSION} \
     && deps=("libc6" "libgcc1" "libgssapi-krb5-2" "libstdc++6" "zlib1g") \
     && if [ "${fromVersion}" = "20.04" ]; then deps+=("libicu66" "libssl1.1"); fi \
     && if [ "${fromVersion}" = "22.04" ]; then deps+=("libicu70" "libssl3" "libunwind8"); fi \
@@ -128,9 +130,13 @@ RUN export fromVersion=${FROM_VERSION} \
         --no-path \
         --channel LTS \
         --version "${DOTNET_SDK_VERSION}" \
-    && rm -rf ./dotnet-install.sh \
+    && rm -rf \
+        ./dotnet-install.sh \
+        /etc/apt/preferences.d/dotnet \
     && dotnet --info \
     && sed "s|^PATH=|PATH=${DOTNET_ROOT}:|mg" -i /etc/environment \
+    && dotnet tool install --global \
+        nbgv \
     && apt-get clean \
     && rm -rf /etc/apt/sources.list.d/* \
     && rm -rf /var/lib/apt/lists/*
@@ -209,16 +215,25 @@ RUN apt-get -y update \
 RUN curl -fsSL https://raw.githubusercontent.com/tj/n/master/bin/n -o ~/n \
     && defaultVersion=$(jq -r '.node.default' ${TOOLSET}) \
     && bash ~/n "${defaultVersion}" \
+    && rm -rf ~/n \
+    && npm install -g npm@latest \
     && while IFS='' read -r node_module; do echo "installing ${node_module}" && npm install -g "${node_module}"; done < <(jq -r '.node_modules[].name' ${TOOLSET}) \
     && echo "Creating the symlink for [now] command to vercel CLI" && ln -s /usr/local/bin/vercel /usr/local/bin/now \
     && chmod -R 777 /usr/local/lib/node_modules \
-    && chmod -R 777 /usr/local/bin \
-    && rm -rf ~/n
+    && chmod -R 777 /usr/local/bin
 
 # Trust PSGallery and install Powershell-/Azure Modules
 RUN pwsh -NonInteractive -Command "Set-PSRepository -Name PSGallery -InstallationPolicy Trusted" \
     && while IFS='' read -r pwshModule; do echo "installing ${pwshModule}" && pwsh -NonInteractive -Command "Install-Module -Name ${pwshModule} -Scope AllUsers -Repository PSGallery"; done < <(jq -r '.powershellModules[].name' ${TOOLSET}) \
     && while IFS='' read -r azVersion; do echo "installing Az ${azVersion}" && pwsh -NonInteractive -Command "Install-Module -Name Az -RequiredVersion ${azVersion} -Scope AllUsers -Repository PSGallery"; done < <(jq -r '.azureModules[].versions[]' ${TOOLSET})
+
+# run all available apt-get upgrades
+# kics-scan ignore-block
+RUN apt-get -y update \
+    && apt-get -y upgrade \
+    && apt-get clean \
+    && rm -rf /etc/apt/sources.list.d/* \
+    && rm -rf /var/lib/apt/lists/*
 
 # cleanup step
 RUN apt-get -y clean \
