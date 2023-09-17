@@ -36,6 +36,11 @@
       "action.yaml",
       "action.yml"
     ],
-    "https://json.schemastore.org/github-issue-config.json": ".github/ISSUE_TEMPLATE/config.yml"
+    "https://json.schemastore.org/github-issue-config.json": ".github/ISSUE_TEMPLATE/config.yml",
+    "https://json.schemastore.org/github-issue-forms.json": [
+      ".github/ISSUE_TEMPLATE/BUG_REPORT.yml",
+      ".github/ISSUE_TEMPLATE/FEATURE_REQUEST.yml"
+    ],
+    "https://raw.githubusercontent.com/hadolint/hadolint/master/contrib/hadolint.json": ".hadolint.yaml"
   }
 }
