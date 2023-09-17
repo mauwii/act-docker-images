@@ -29,6 +29,7 @@
     },
     "editor.tabSize": 2
   },
+  "cSpell.enableFiletypes": ["dockerfile"],
   "shellformat.flag": "--indent 4 --binary-next-line --case-indent",
   "yaml.format.singleQuote": true
 }

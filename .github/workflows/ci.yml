@@ -23,8 +23,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        # platforms: ['linux/amd64,linux/arm64']
-        platforms: ${{ github.event_name == 'pull_request' && fromJson(format('["{0}", "{1}"]', 'linux/amd64','linux/arm64')) || fromJson('["linux/amd64,linux/arm64"]') }}
+        platforms: ${{ github.event_name == 'pull_request' && fromJson('["linux/amd64", "linux/arm64"]') || fromJson('["linux/amd64,linux/arm64"]') }}
         from-version: ['22.04', '20.04']
         include:
           - from-version: '22.04'
@@ -157,6 +156,11 @@ jobs:
       #   env:
       #     REGISTRY_IMAGE: ${{ format('{0}/{1}', env.REGISTRY, env.IMAGE_REPOSITORY) }}
 
+      - name: get arch
+        id: cache-arch
+        if: github.event_name == 'pull_request'
+        run: echo "CACHE_ARCH=$(docker run --platform ${{ matrix.platforms }} --rm -i -t ubuntu:22.04 dpkg --print-architecture)" >> "$GITHUB_OUTPUT"
+
       # Build and push Docker images
       - name: build image
         run: >-
@@ -165,8 +169,10 @@ jobs:
           --file linux/${{ matrix.distro }}/Dockerfile
           --platform ${{ matrix.platforms }}
           --cache-from ${{ format('type=registry,ref={0}:{1}', env.REGISTRY_IMAGE, matrix.from-version) }}
-          --cache-from ${{ format('type=registry,ref={0}:cache-{1}', env.REGISTRY_IMAGE, matrix.codename) }}
-          --cache-to ${{ format('type=registry,ref={0}:cache-{1},mode=max', env.REGISTRY_IMAGE, matrix.codename) }}
+          --cache-from ${{ format('type=registry,ref={0}:cache-{1}-{2}', env.REGISTRY_IMAGE, matrix.codename, 'amd64') }}
+          --cache-from ${{ format('type=registry,ref={0}:cache-{1}-{2}', env.REGISTRY_IMAGE, matrix.codename, 'arm64') }}
+          --ulimit=nofile=4096:4096
+          ${{ github.event_name == 'pull_request' && format('--cache-to type=registry,ref={0}:cache-{1}-{2},mode=max', env.REGISTRY_IMAGE, matrix.codename, steps.cache-arch.outputs.CACHE_ARCH) || '' }}
           --build-arg FROM_IMAGE='buildpack-deps'
           --build-arg FROM_VERSION_MAJOR='${{ matrix.from-version-major }}'
           --build-arg FROM_VERSION_MINOR='${{ matrix.from-version-minor }}'
