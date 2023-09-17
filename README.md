@@ -124,7 +124,7 @@ To execute the mega-linter locally:
 
 ```bash
 npx mega-linter-runner \
-    --flavor salesforce \
+    --flavor security \  # Optional, the workflow runs the full container
     -e GITHUB_TOKEN="$(gh auth token)" \
     --remove-container
 ```
