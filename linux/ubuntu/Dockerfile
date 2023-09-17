@@ -35,12 +35,14 @@ RUN export targetarch=${TARGETARCH} \
     && echo ${targetarch} >/tmp/targetproc
 
 # setup environment
-ENV AGENT_TOOLSDIRECTORY=/opt/hostedtoolcache
+ENV AGENT_TOOLSDIRECTORY=/opt/hostedtoolcache \
+    AZURE_EXTENSION_DIR=/opt/az/azcliextensions
 RUN sed 's|"||g' -i "/etc/environment" \
     && echo "IMAGE_OS=${DISTRO}${FROM_VERSION_MAJOR}" | tee -a /etc/environment \
     && echo "ImageOS=${DISTRO}${FROM_VERSION_MAJOR}" | tee -a /etc/environment \
     && echo "LSB_RELEASE=${FROM_VERSION}" | tee -a /etc/environment \
     && echo "AGENT_TOOLSDIRECTORY=${AGENT_TOOLSDIRECTORY}" | tee -a /etc/environment \
+    && echo "AZURE_EXTENSION_DIR=$AZURE_EXTENSION_DIR" | tee -a /etc/environment \
     && echo "RUN_TOOL_CACHE=${AGENT_TOOLSDIRECTORY}" | tee -a /etc/environment \
     && echo "DEPLOYMENT_BASEPATH=/opt/runner" | tee -a /etc/environment \
     && echo "LSB_OS_VERSION=${FROM_VERSION_MAJOR}${FROM_VERSION_MINOR}" | tee -a /etc/environment \
