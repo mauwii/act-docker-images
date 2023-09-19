@@ -8,11 +8,9 @@ on:
     paths:
       - '**/Dockerfile'
       - '**/toolsets/*.json'
-  pull_request:
-    paths:
-      - '**/Dockerfile'
-      - '**/toolsets/*.json'
       - '**/.github/workflows/ci.yml'
+  pull_request:
+    branches: [main]
   workflow_dispatch:
 
 permissions:
