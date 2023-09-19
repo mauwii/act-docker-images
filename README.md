@@ -35,7 +35,7 @@ on your local host.
 
 The easiest way is to add those lines in your `~/.actrc`:
 
-```shell
+```bash
 -P ubuntu-latest=mauwii/ubuntu-act:latest
 -P ubuntu-22.04=mauwii/ubuntu-act:22.04
 -P ubuntu-20.04=mauwii/ubuntu-act:20.04
@@ -120,14 +120,33 @@ documentation📖][nektosDocs]
 
 ## mega-linter
 
-To execute the mega-linter locally:
+To execute the mega-linter locally without the needs to install it, there are different options:
 
-```bash
-npx mega-linter-runner \
-    --flavor security \  # Optional, the workflow runs the full container
-    -e GITHUB_TOKEN="$(gh auth token)" \
-    --remove-container
-```
+- you can use act (I assume you run act the way I just explained):
+
+  This has the advantage that you run act with the same settings as the workflow itself would do.
+
+  ```bash
+  act -W .github/workflows/mega-linter.yml
+  ```
+
+- or you could use npx:
+
+  ```bash
+  npx mega-linter-runner \
+      --flavor security \  # Optional, the workflow runs the full container
+      -e GITHUB_TOKEN="$(gh auth token)" \
+      --remove-container
+  ```
+
+## Pre-Commit-Hook
+
+I integrated a pre-commit hook to run mega-linter. There are different ways to install pre-commit on
+your system. I used brew since I am working on MacOS (`brew install pre-commit`). Another easy way
+would be via pipx.
+
+After successfully installing pre-commit on your system, you need to run `pre-commit install` in the
+repository root if you want to enable the pre-commit hooks on your system as well.
 
 [dockerHub]: https://hub.docker.com/r/mauwii/ubuntu-act/ "DockerHub"
 [githubRepo]: https://github.com/mauwii/act-docker-images/ "GitHub repository"
