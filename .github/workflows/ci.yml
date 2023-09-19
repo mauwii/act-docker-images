@@ -197,7 +197,7 @@ jobs:
         uses: docker/scout-action@v0.23.4
         if: github.event_name == 'pull_request'
         with:
-          # platform: linux/amd64
+          platform: ${{ matrix.platforms }}
           command: sbom,compare
           image: ${{ env.TO_IMAGE_PATH }}
           type: archive
