@@ -1,3 +1,5 @@
+# yaml-language-server: $schema=https://json.schemastore.org/github-workflow.json
+
 name: ci
 
 on:
@@ -47,10 +49,10 @@ jobs:
       BUILDKIT_PROGRESS: plain
       IMAGE_NAME: ${{ format('{0}-{1}', matrix.distro, matrix.from-flavor) }}
       IMAGE_REPOSITORY: ${{ format('{0}/{1}-{2}', vars.DOCKERHUB_USER || github.repository_owner, matrix.distro, matrix.from-flavor) }}
+      REGISTRY: ${{ vars.DOCKERHUB_USER && 'docker.io' || 'ghcr.io' }}
       SHA: ${{ github.event.pull_request.head.sha || github.event.after || github.sha }}
       TO_TAG: ${{ format('{0}/{1}/{2}-{3}:{4}', 'docker.io', vars.DOCKERHUB_USER, matrix.distro, matrix.from-flavor, matrix.from-version) }}
-      REGISTRY: ${{ vars.DOCKERHUB_USER && 'docker.io' || 'ghcr.io' }}
-      PATH_TO_IMAGE: /tmp/${{ matrix.distro }}-${{ matrix.from-version }}.tar
+      TO_IMAGE_PATH: /tmp/${{ matrix.distro }}-${{ matrix.from-version }}.tar
     steps:
       - uses: actions/checkout@v4
 
@@ -73,23 +75,13 @@ jobs:
           cleanup: true
           platforms: ${{ matrix.platforms }}
 
-      # Login to github container registry
-      # https://github.com/docker/login-action
-      - name: Login to GitHub Container Registry
-        uses: docker/login-action@v3.0.0
-        if: vars.DOCKERHUB_USER == ''
-        with:
-          registry: ghcr.io
-          username: ${{ github.repository_owner }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
       # Login against a Docker registry
       # https://github.com/docker/login-action
-      - name: Login to Docker Hub
+      - name: Login to ${{ env.REGISTRY }}
         uses: docker/login-action@v3.0.0
-        if: vars.DOCKERHUB_USER != ''
+        if: env.REGISTRY == 'docker.io'
         with:
-          registry: docker.io
+          registry: ${{ env.REGISTRY }}
           username: ${{ vars.DOCKERHUB_USER }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
           logout: true
@@ -149,13 +141,14 @@ jobs:
       #     # don't export cache on PR
       #     cache-to: ${{ github.ref == 'refs/heads/main' && format('type=registry,ref={0}:cache-{1},mode=max', env.REGISTRY_IMAGE, matrix.codename) || '' }}
       #     # this will give us some useful information about the build
+      #     push: ${{ github.ref == 'refs/heads/main' }}
       #     provenance: mode=max
       #     # push if not building with act
-      #     push: ${{ github.ref == 'refs/heads/main' }}
-      #     outputs: 'type=oci,dest=${{ env.PATH_TO_IMAGE }}'
+      #     outputs: 'type=oci,dest=${{ env.TO_IMAGE_PATH }}'
       #   env:
       #     REGISTRY_IMAGE: ${{ format('{0}/{1}', env.REGISTRY, env.IMAGE_REPOSITORY) }}
 
+      # Get the architecture to use for the cache tag
       - name: get arch
         id: cache-arch
         if: github.event_name == 'pull_request'
@@ -180,10 +173,10 @@ jobs:
           --build-arg FROM_IMAGE='buildpack-deps'
           --build-arg FROM_VERSION_MAJOR='${{ matrix.from-version-major }}'
           --build-arg FROM_VERSION_MINOR='${{ matrix.from-version-minor }}'
+          --build-arg CODENAME='${{ matrix.codename }}'
           --build-arg FROM_FLAVOR='${{ matrix.from-flavor }}'
           --build-arg DISTRO='${{ matrix.distro }}'
-          --build-arg CODENAME='${{ matrix.codename }}'
-          ${{ fromJson(env.IS_MAIN) && '--output=type=registry,push=true' || format('--output=type=docker,dest={0}',  env.PATH_TO_IMAGE) }}
+          ${{ fromJson(env.IS_MAIN) && '--output=type=registry,push=true' || format('--output=type=docker,dest={0}',  env.TO_IMAGE_PATH) }}
           --label org.opencontainers.image.authors='${{ env.TAG_AUTHORS }}'
           --label org.opencontainers.image.description='${{ github.event.repository.description }}'
           --label org.opencontainers.image.documentation='${{ env.REPOSITORY_LINK }}'
@@ -208,7 +201,7 @@ jobs:
         with:
           # platform: linux/amd64
           command: sbom,compare
-          image: ${{ env.PATH_TO_IMAGE }}
+          image: ${{ env.TO_IMAGE_PATH }}
           type: archive
           to: ${{ env.TO_TAG }}
           ignore-unchanged: true
@@ -219,17 +212,17 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           organization: ${{ vars.DOCKERHUB_USER || github.repository_owner }}
 
-  # ToDo: Move into a separate workflow and depend on ci and mega-linter
   approve-pr:
     name: Approve PR
     runs-on: ubuntu-latest
     needs: [build]
-    if: contains(fromJson('["mauwii","dependabot[bot]"]'), github.triggering_actor) && github.event_name == 'pull_request' &&  needs.build.result == 'success'
+    if: github.actor != 'nektos/act' && contains(fromJson('["mauwii","dependabot[bot]"]'), github.triggering_actor) && github.event_name == 'pull_request' &&  needs.build.result == 'success'
     permissions:
       contents: read
       pull-requests: write
       actions: write
     steps:
+      # approve the PR (there is still a code-owner review necessary)
       - name: Approve PR
         run: gh pr review --approve "$PR_URL"
         env:
