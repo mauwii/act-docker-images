@@ -1,4 +1,6 @@
 ---
+# yaml-language-server: $schema=https://json.schemastore.org/github-workflow.json
+
 # MegaLinter GitHub Action configuration file
 # More info at https://megalinter.io
 name: MegaLinter
@@ -57,7 +59,7 @@ jobs:
 
       # Upload MegaLinter artifacts
       - name: Archive production artifacts
-        if: ${{ success() }} || ${{ failure() }} && github.actor != 'nektos/act'
+        if: github.actor != 'nektos/act' && (success() || failure())
         uses: actions/upload-artifact@v3
         with:
           name: MegaLinter reports
