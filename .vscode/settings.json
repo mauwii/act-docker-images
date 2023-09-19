@@ -19,7 +19,7 @@
   "[yaml]": {
     "diffEditor.ignoreTrimWhitespace": false,
     "editor.autoIndent": "keep",
-    "editor.defaultFormatter": "redhat.vscode-yaml",
+    "editor.defaultFormatter": "esbenp.prettier-vscode",
     "editor.formatOnSave": true,
     "editor.insertSpaces": true,
     "editor.quickSuggestions": {
@@ -30,6 +30,5 @@
     "editor.tabSize": 2
   },
   "cSpell.enableFiletypes": ["dockerfile"],
-  "shellformat.flag": "--indent 4 --binary-next-line --case-indent",
-  "yaml.format.singleQuote": true
+  "shellformat.flag": "--indent 4 --binary-next-line --case-indent"
 }
