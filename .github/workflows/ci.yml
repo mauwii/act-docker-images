@@ -204,14 +204,13 @@ jobs:
         if: github.event_name == 'pull_request'
         with:
           platform: ${{ matrix.platforms }}
-          command: sbom,compare
+          command: compare
           image: ${{ env.FROM_IMAGE_PATH }}
           type: archive
           to: ${{ env.TO_TAG }}
           ignore-unchanged: true
           only-severities: critical
           write-comment: ${{ github.actor != 'nektos/act' }}
-          keep-previous-comments: true
           summary: ${{ github.actor != 'nektos/act' }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
           organization: ${{ vars.DOCKERHUB_USER || github.repository_owner }}
