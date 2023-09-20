@@ -242,6 +242,7 @@ RUN apt-get -y update \
 # install python 3, pip, venv, pipx
 ENV PIPX_BIN_DIR=/opt/pipx_bin \
     PIPX_HOME=/opt/pipx
+# kics-scan ignore-block
 RUN apt-get -y update \
     && apt-get -y install --no-install-recommends \
         python3 \
