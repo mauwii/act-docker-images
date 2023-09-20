@@ -229,6 +229,14 @@ RUN pwsh -NonInteractive -Command "Set-PSRepository -Name PSGallery -Installatio
     && while IFS='' read -r pwshModule; do echo "installing ${pwshModule}" && pwsh -NonInteractive -Command "Install-Module -Name ${pwshModule} -Scope AllUsers -Repository PSGallery"; done < <(jq -r '.powershellModules[].name' ${TOOLSET}) \
     && while IFS='' read -r azVersion; do echo "installing Az ${azVersion}" && pwsh -NonInteractive -Command "Install-Module -Name Az -RequiredVersion ${azVersion} -Scope AllUsers -Repository PSGallery"; done < <(jq -r '.azureModules[].versions[]' ${TOOLSET})
 
+# install golang-1.20-go
+RUN apt-get -y update \
+    && apt-get -y install --no-install-recommends \
+        golang-1.20-go \
+    && apt-get clean \
+    && rm -rf /etc/apt/sources.list.d/* \
+    && rm -rf /var/lib/apt/lists/*
+
 # run all available apt-get upgrades
 # kics-scan ignore-block
 RUN apt-get -y update \
