@@ -217,12 +217,10 @@ RUN apt-get -y update \
     && rm -rf /var/lib/apt/lists/*
 
 # Install default NodeJS and toolset node_modules
-# hadolint ignore=SC2174
 RUN curl -fsSL https://raw.githubusercontent.com/tj/n/master/bin/n -o ~/n \
     && defaultVersion=$(jq -r '.node.default' ${TOOLSET}) \
     && bash ~/n "${defaultVersion}" \
     && rm -rf ~/n \
-    && npm install -g npm@latest \
     && chmod -R 777 /usr/local/lib/node_modules \
     && chmod -R 777 /usr/local/bin
 
