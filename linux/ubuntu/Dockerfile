@@ -24,8 +24,14 @@ ARG TYPE=act
 ENV DEBIAN_FRONTEND=noninteractive
 
 # set locale
-ENV LANG=C.UTF-8
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        locales \
+    && rm -rf /var/lib/apt/lists/* \
+    && localedef -i en_US -c -f UTF-8 -A /usr/share/locale/locale.alias en_US.UTF-8
+ENV LANG en_US.utf8
 
+# enable pipefail and set workdir
 SHELL [ "/bin/bash", "--login", "-e", "-o", "pipefail", "-c" ]
 WORKDIR /tmp
 
@@ -57,7 +63,7 @@ RUN ssh-keyscan github.com >>/etc/ssh/ssh_known_hosts \
 # Install dependencies
 RUN apt-get -y update \
     && packages=(gawk sudo jq gnupg-agent ca-certificates software-properties-common apt-transport-https zstd zip unzip xz-utils) \
-    && apt-get -y install --no-install-recommends --no-install-suggests \
+    && apt-get -y install --no-install-recommends \
         "${packages[@]}" \
     && apt-get clean \
     && rm -rf /etc/apt/sources.list.d/* \
@@ -82,7 +88,7 @@ RUN add-apt-repository -y ppa:git-core/ppa \
 
 # Install Git-LFS
 RUN curl -Ls https://packagecloud.io/install/repositories/github/git-lfs/script.deb.sh | bash \
-    && apt-get -y install --no-install-recommends --no-install-suggests \
+    && apt-get -y install --no-install-recommends \
         git-lfs \
     && apt-get clean \
     && rm -rf /etc/apt/sources.list.d/* \
@@ -94,7 +100,7 @@ RUN echo "deb https://packages.microsoft.com/ubuntu/$(lsb_release -rs)/prod $(ls
     && curl -sL https://packages.microsoft.com/keys/microsoft.asc \
     | gpg --dearmor >/etc/apt/trusted.gpg.d/microsoft.gpg \
     && apt-get -y update \
-    && apt-get -y install --no-install-recommends --no-install-suggests \
+    && apt-get -y install --no-install-recommends \
         moby-cli \
         moby-buildx \
         moby-compose \
@@ -105,16 +111,17 @@ RUN echo "deb https://packages.microsoft.com/ubuntu/$(lsb_release -rs)/prod $(ls
     && rm -rf /var/lib/apt/lists/*
 
 # Set .NET related environment variables
-ENV \
-    DOTNET_ROOT=${AGENT_TOOLSDIRECTORY}/dotnet \
-    PATH=${HOME}/.dotnet/tools:${AGENT_TOOLSDIRECTORY}/dotnet:${PATH} \
+ENV DOTNET_CLI_TELEMETRY_OPTOUT=1 \
     DOTNET_GENERATE_ASPNET_CERTIFICATE=false \
+    DOTNET_HOST_PATH=${AGENT_TOOLSDIRECTORY}/dotnet/dotnet \
+    DOTNET_MULTILEVEL_LOOKUP=0 \
     DOTNET_NOLOGO=true \
+    DOTNET_ROOT=${AGENT_TOOLSDIRECTORY}/dotnet \
     DOTNET_SDK_VERSION=6.0.413 \
     DOTNET_USE_POLLING_FILE_WATCHER=true \
     NUGET_XMLDOC_MODE=skip \
-    DOTNET_CLI_TELEMETRY_OPTOUT=1 \
-    DOTNET_MULTILEVEL_LOOKUP=0
+    NUGET_PACKAGES=${AGENT_TOOLSDIRECTORY}/nugetpackages \
+    PATH=${AGENT_TOOLSDIRECTORY}/dotnet/tools:${AGENT_TOOLSDIRECTORY}/dotnet:${PATH}
 
 # install .NET SDK LTS
 RUN printf "Package: *net*\nPin: origin packages.microsoft.com\nPin-Priority: 1001\n" >/etc/apt/preferences.d/dotnet \
@@ -125,7 +132,7 @@ RUN printf "Package: *net*\nPin: origin packages.microsoft.com\nPin-Priority: 10
     && apt-get -y update \
     && apt-get -y install --no-install-recommends \
         "${deps[@]}" \
-    && curl -L https://dot.net/v1/dotnet-install.sh -o dotnet-install.sh \
+    && curl -Ls https://dot.net/v1/dotnet-install.sh -o dotnet-install.sh \
     && chmod +x ./dotnet-install.sh \
     && ./dotnet-install.sh \
         --install-dir "${DOTNET_ROOT}" \
@@ -135,10 +142,7 @@ RUN printf "Package: *net*\nPin: origin packages.microsoft.com\nPin-Priority: 10
     && rm -rf \
         ./dotnet-install.sh \
         /etc/apt/preferences.d/dotnet \
-    && dotnet --info \
     && sed "s|^PATH=|PATH=${DOTNET_ROOT}:|mg" -i /etc/environment \
-    && dotnet tool install --global \
-        nbgv \
     && apt-get clean \
     && rm -rf /etc/apt/sources.list.d/* \
     && rm -rf /var/lib/apt/lists/*
@@ -206,21 +210,17 @@ COPY linux/${DISTRO}/toolsets/${FROM_VERSION_MAJOR}${FROM_VERSION_MINOR}.json ${
 RUN apt-get -y update \
     && packages=() \
     && while IFS='' read -r line; do packages+=("${line}"); done < <(jq -r '.apt|.vital_packages[],.common_packages[],.cmd_packages[]' ${TOOLSET}) \
-    && apt-get -y install --no-install-recommends --no-upgrade \
+    && apt-get -y install --no-install-recommends \
         "${packages[@]}" \
     && apt-get clean \
     && rm -rf /etc/apt/sources.list.d/* \
     && rm -rf /var/lib/apt/lists/*
 
 # Install default NodeJS and toolset node_modules
-# hadolint ignore=SC2174
 RUN curl -fsSL https://raw.githubusercontent.com/tj/n/master/bin/n -o ~/n \
     && defaultVersion=$(jq -r '.node.default' ${TOOLSET}) \
     && bash ~/n "${defaultVersion}" \
     && rm -rf ~/n \
-    && npm install -g npm@latest \
-    && while IFS='' read -r node_module; do echo "installing ${node_module}" && npm install -g "${node_module}"; done < <(jq -r '.node_modules[].name' ${TOOLSET}) \
-    && echo "Creating the symlink for [now] command to vercel CLI" && ln -s /usr/local/bin/vercel /usr/local/bin/now \
     && chmod -R 777 /usr/local/lib/node_modules \
     && chmod -R 777 /usr/local/bin
 
@@ -229,13 +229,33 @@ RUN pwsh -NonInteractive -Command "Set-PSRepository -Name PSGallery -Installatio
     && while IFS='' read -r pwshModule; do echo "installing ${pwshModule}" && pwsh -NonInteractive -Command "Install-Module -Name ${pwshModule} -Scope AllUsers -Repository PSGallery"; done < <(jq -r '.powershellModules[].name' ${TOOLSET}) \
     && while IFS='' read -r azVersion; do echo "installing Az ${azVersion}" && pwsh -NonInteractive -Command "Install-Module -Name Az -RequiredVersion ${azVersion} -Scope AllUsers -Repository PSGallery"; done < <(jq -r '.azureModules[].versions[]' ${TOOLSET})
 
-# run all available apt-get upgrades
-# kics-scan ignore-block
+# install golang-1.20-go
 RUN apt-get -y update \
-    && apt-get -y upgrade \
+    && apt-get -y install --no-install-recommends \
+        golang-1.20-go \
     && apt-get clean \
     && rm -rf /etc/apt/sources.list.d/* \
     && rm -rf /var/lib/apt/lists/*
+
+# install python 3, pip, venv, pipx
+ENV PIPX_BIN_DIR=/opt/pipx_bin \
+    PIPX_HOME=/opt/pipx
+# kics-scan ignore-block
+RUN apt-get -y update \
+    && apt-get -y install --no-install-recommends \
+        python3 \
+        python3-dev \
+        python3-pip \
+        python3-venv \
+    && python3 -m pip install --no-cache-dir \
+        pipx \
+    && python3 -m pipx ensurepath \
+    && if ! command -v pipx; then echo "pipx was not installed or not found on PATH" && exit 1; fi \
+    && sed "s|^PATH=|PATH=${PIPX_BIN_DIR}:|mg" -i /etc/environment \
+    && apt-get clean \
+    && rm -rf /etc/apt/sources.list.d/* \
+    && rm -rf /var/lib/apt/lists/*
+ENV PATH=${PIPX_BIN_DIR}:${PATH}
 
 # cleanup step
 RUN apt-get -y clean \
