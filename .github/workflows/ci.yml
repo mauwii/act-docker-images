@@ -204,7 +204,7 @@ jobs:
         if: github.event_name == 'pull_request'
         with:
           platform: ${{ matrix.platforms }}
-          command: compare
+          command: quickview
           image: ${{ env.FROM_IMAGE_PATH }}
           type: archive
           to: ${{ env.TO_TAG }}
