@@ -46,7 +46,7 @@ documentation📖][nektosDocs]
 
 ## How I run act on my M2-Max 💻
 
-- installed HEAD Version of act via brew
+- installed HEAD Version of act via brew (since node20 support is not yet released)
 
   ```bash
   brew install --HEAD act
@@ -64,33 +64,7 @@ documentation📖][nektosDocs]
   fi
   ```
 
-> Previously I had issues when using the brew version of act, which seem to be gone 🥳
->
-> But if you run into kind of the same issues, this is how I used it as a github cli extension:
->
-> - didnt work properly when installed via brew, so I installed it via GitHub-CLI:
->
->   ```bash
->   gh extension install https://github.com/nektos/gh-act
->   ```
->
-> - set an alias:
->
->   ```bash
->   if gh extension list | grep -q "nektos/gh-act"; then
->     alias act='gh act -s GITHUB_TOKEN="$(gh auth token)"'
->   fi
->   ```
-
 - Docker-Desktop settings:
-
-  - Advanced:
-
-    ✔️ Allow the default Docker socket to be used (requires password)
-
-  - Features in Development:
-
-    ✔️ All Beta Features enabled (containerd, wasm, rosetta and builds view)
 
   - Docker Engine (`~/.docker/daemon.json`):
 
@@ -108,6 +82,20 @@ documentation📖][nektosDocs]
       }
     }
     ```
+
+  - Features in Development:
+
+    - [ ] containerd
+    - [ ] wasm
+    - [x] rosetta
+    - [x] builds view
+
+  - Advanced:
+    - [ ] system
+    - [x] user
+    - [x] Allow the default Docker socket to be used
+    - [ ] Allow privileged port mapping
+    - [x] Automatically check configuration
 
 - `~/.actrc`:
 

@@ -23,6 +23,9 @@ ARG TYPE=act
 # Force apt to not be interactive/not ask
 ENV DEBIAN_FRONTEND=noninteractive
 
+# Configure apt to always assume Y
+RUN echo "APT::Get::Assume-Yes \"true\";" >/etc/apt/apt.conf.d/90assumeyes
+
 # set locale
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
@@ -61,7 +64,7 @@ RUN ssh-keyscan github.com >>/etc/ssh/ssh_known_hosts \
     && ssh-keyscan ssh.dev.azure.com >>/etc/ssh/ssh_known_hosts
 
 # Install dependencies
-RUN apt-get -y update \
+RUN apt-get -y update &> /dev/null \
     && packages=(gawk sudo jq gnupg-agent ca-certificates software-properties-common apt-transport-https zstd zip unzip xz-utils) \
     && apt-get -y install --no-install-recommends \
         "${packages[@]}" \
@@ -71,6 +74,7 @@ RUN apt-get -y update \
 
 # Install apt-fast
 RUN bash -c "$(curl -fsSL https://raw.githubusercontent.com/ilikenwf/apt-fast/master/quick-install.sh)" \
+    && apt-get -y upgrade \
     && apt-get clean \
     && rm -rf /etc/apt/sources.list.d/* \
     && rm -rf /var/lib/apt/lists/*
@@ -78,10 +82,10 @@ RUN bash -c "$(curl -fsSL https://raw.githubusercontent.com/ilikenwf/apt-fast/ma
 # Install current version of git
 # hadolint ignore=SC2035
 RUN add-apt-repository -y ppa:git-core/ppa \
-    && apt-get -y update \
+    && apt-get -y update &> /dev/null \
     && apt-get -y install --no-install-recommends \
         git \
-    && git config --global safe.directory * \
+    && printf "[safe]\n\tdirectory = *\n" | tee -a /etc/gitconfig \
     && apt-get clean \
     && rm -rf /etc/apt/sources.list.d/* \
     && rm -rf /var/lib/apt/lists/*
@@ -97,9 +101,8 @@ RUN curl -Ls https://packagecloud.io/install/repositories/github/git-lfs/script.
 # Install docker cli
 RUN echo "deb https://packages.microsoft.com/ubuntu/$(lsb_release -rs)/prod $(lsb_release -cs) main" \
     | tee /etc/apt/sources.list.d/microsoft-prod.list \
-    && curl -sL https://packages.microsoft.com/keys/microsoft.asc \
-    | gpg --dearmor >/etc/apt/trusted.gpg.d/microsoft.gpg \
-    && apt-get -y update \
+    && curl -fsSL https://packages.microsoft.com/keys/microsoft.asc | apt-key add - \
+    && apt-get -y update &> /dev/null \
     && apt-get -y install --no-install-recommends \
         moby-cli \
         moby-buildx \
@@ -116,8 +119,9 @@ ENV DOTNET_CLI_TELEMETRY_OPTOUT=1 \
     DOTNET_HOST_PATH=${AGENT_TOOLSDIRECTORY}/dotnet/dotnet \
     DOTNET_MULTILEVEL_LOOKUP=0 \
     DOTNET_NOLOGO=true \
+    DOTNET_ROLL_FORWARD=Major \
     DOTNET_ROOT=${AGENT_TOOLSDIRECTORY}/dotnet \
-    DOTNET_SDK_VERSION=6.0.413 \
+    DOTNET_SDK_VERSION=6.0.414 \
     DOTNET_USE_POLLING_FILE_WATCHER=true \
     NUGET_XMLDOC_MODE=skip \
     NUGET_PACKAGES=${AGENT_TOOLSDIRECTORY}/nugetpackages \
@@ -125,23 +129,18 @@ ENV DOTNET_CLI_TELEMETRY_OPTOUT=1 \
 
 # install .NET SDK LTS
 RUN printf "Package: *net*\nPin: origin packages.microsoft.com\nPin-Priority: 1001\n" >/etc/apt/preferences.d/dotnet \
-    && export fromVersion=${FROM_VERSION} \
     && deps=("libc6" "libgcc1" "libgssapi-krb5-2" "libstdc++6" "zlib1g") \
-    && if [ "${fromVersion}" = "20.04" ]; then deps+=("libicu66" "libssl1.1"); fi \
-    && if [ "${fromVersion}" = "22.04" ]; then deps+=("libicu70" "libssl3" "libunwind8"); fi \
-    && apt-get -y update \
+    && if [ "${FROM_VERSION}" = "20.04" ]; then deps+=("libicu66" "libssl1.1"); fi \
+    && if [ "${FROM_VERSION}" = "22.04" ]; then deps+=("libicu70" "libssl3" "libunwind8"); fi \
+    && apt-get -y update &> /dev/null \
     && apt-get -y install --no-install-recommends \
         "${deps[@]}" \
-    && curl -Ls https://dot.net/v1/dotnet-install.sh -o dotnet-install.sh \
-    && chmod +x ./dotnet-install.sh \
-    && ./dotnet-install.sh \
+    && curl -fsSL https://dot.net/v1/dotnet-install.sh | bash -s -- \
         --install-dir "${DOTNET_ROOT}" \
         --no-path \
         --channel LTS \
         --version "${DOTNET_SDK_VERSION}" \
-    && rm -rf \
-        ./dotnet-install.sh \
-        /etc/apt/preferences.d/dotnet \
+    && rm -rf /etc/apt/preferences.d/dotnet \
     && sed "s|^PATH=|PATH=${DOTNET_ROOT}:|mg" -i /etc/environment \
     && apt-get clean \
     && rm -rf /etc/apt/sources.list.d/* \
@@ -150,16 +149,16 @@ RUN printf "Package: *net*\nPin: origin packages.microsoft.com\nPin-Priority: 10
 # Install PowerShell global tool
 RUN export powershell_version=7.2.13 \
     && export tool_path=/usr/share/powershell \
-    && curl -fSL \
-        --output PowerShell.Linux."$(cat /tmp/targetproc)".${powershell_version}.nupkg \
-        https://pwshtool.blob.core.windows.net/tool/${powershell_version}/PowerShell.Linux."$(cat /tmp/targetproc)".${powershell_version}.nupkg \
+    && pwsh_nupkg="PowerShell.Linux.$(cat /tmp/targetproc).${powershell_version}.nupkg" \
+    && export pwsh_nupkg \
+    && curl -fSLO "https://pwshtool.blob.core.windows.net/tool/${powershell_version}/${pwsh_nupkg}" \
     && dotnet tool install \
         --add-source / \
         --tool-path "${tool_path}" \
-        --version ${powershell_version} \
+        --version "${powershell_version}" \
         PowerShell.Linux."$(cat /tmp/targetproc)" \
     && dotnet nuget locals all --clear \
-    && rm PowerShell.Linux."$(cat /tmp/targetproc)".${powershell_version}.nupkg \
+    && rm "${pwsh_nupkg}" \
     && ln -s "${tool_path}/pwsh" /usr/bin/pwsh \
     && chmod 755 "${tool_path}/pwsh" \
     && find "${tool_path}" -print | grep -i '.*[.]nupkg$' | xargs rm
@@ -170,7 +169,7 @@ RUN curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
     && chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg \
     && echo "deb [arch=${TARGETARCH} signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" \
     | tee /etc/apt/sources.list.d/github-cli.list >/dev/null \
-    && apt-get -y update \
+    && apt-get -y update &> /dev/null \
     && apt-get -y install --no-install-recommends \
         gh \
     && apt-get clean \
@@ -179,10 +178,10 @@ RUN curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
 
 # Install Azure CLI
 RUN [[ $(curl -sL https://packages.microsoft.com/repos/azure-cli/dists/) =~ $(lsb_release -cs) ]] \
-    && (curl -sL https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor >/etc/apt/trusted.gpg.d/microsoft.gpg \
+    && (curl -fsSL https://packages.microsoft.com/keys/microsoft.asc | apt-key add - \
         && echo "deb [arch=$(dpkg --print-architecture)] https://packages.microsoft.com/repos/azure-cli/ $(lsb_release -cs) main" \
-            >/etc/apt/sources.list.d/azure-cli.list \
-        && apt-get -y update \
+        | tee /etc/apt/sources.list.d/azure.list \
+        && apt-get -y update &> /dev/null \
         && apt-get -y install --no-install-recommends \
             azure-cli \
         && az extension add -n azure-devops \
@@ -207,7 +206,7 @@ COPY linux/${DISTRO}/toolsets/${FROM_VERSION_MAJOR}${FROM_VERSION_MINOR}.json ${
 
 # install apt packages from toolset
 # hadolint ignore=SC2207
-RUN apt-get -y update \
+RUN apt-get -y update &> /dev/null \
     && packages=() \
     && while IFS='' read -r line; do packages+=("${line}"); done < <(jq -r '.apt|.vital_packages[],.common_packages[],.cmd_packages[]' ${TOOLSET}) \
     && apt-get -y install --no-install-recommends \
@@ -229,19 +228,11 @@ RUN pwsh -NonInteractive -Command "Set-PSRepository -Name PSGallery -Installatio
     && while IFS='' read -r pwshModule; do echo "installing ${pwshModule}" && pwsh -NonInteractive -Command "Install-Module -Name ${pwshModule} -Scope AllUsers -Repository PSGallery"; done < <(jq -r '.powershellModules[].name' ${TOOLSET}) \
     && while IFS='' read -r azVersion; do echo "installing Az ${azVersion}" && pwsh -NonInteractive -Command "Install-Module -Name Az -RequiredVersion ${azVersion} -Scope AllUsers -Repository PSGallery"; done < <(jq -r '.azureModules[].versions[]' ${TOOLSET})
 
-# install golang-1.20-go
-RUN apt-get -y update \
-    && apt-get -y install --no-install-recommends \
-        golang-1.20-go \
-    && apt-get clean \
-    && rm -rf /etc/apt/sources.list.d/* \
-    && rm -rf /var/lib/apt/lists/*
-
 # install python 3, pip, venv, pipx
 ENV PIPX_BIN_DIR=/opt/pipx_bin \
     PIPX_HOME=/opt/pipx
 # kics-scan ignore-block
-RUN apt-get -y update \
+RUN apt-get -y update &> /dev/null \
     && apt-get -y install --no-install-recommends \
         python3 \
         python3-dev \
@@ -256,6 +247,24 @@ RUN apt-get -y update \
     && rm -rf /etc/apt/sources.list.d/* \
     && rm -rf /var/lib/apt/lists/*
 ENV PATH=${PIPX_BIN_DIR}:${PATH}
+
+# Install Go
+ENV PATH=/usr/local/go/bin:${PATH}
+ARG GOLANG_VERSION=1.20.8 \
+    GOLANG_SHA256_amd64=cc97c28d9c252fbf28f91950d830201aa403836cbed702a05932e63f7f0c7bc4 \
+    GOLANG_SHA256_arm64=15ab379c6a2b0d086fe3e74be4599420e66549edf7426a300ee0f3809500f89e
+RUN curl -fsSLo /tmp/go.tgz "https://golang.org/dl/go${GOLANG_VERSION}.linux-$(cat /tmp/targetproc).tar.gz" \
+    && go_sha="${go_sha=GOLANG_SHA256_$(cat /tmp/targetproc)}" \
+    && echo "${!go_sha} /tmp/go.tgz" | sha256sum -c - \
+    && tar -C /usr/local -xzf /tmp/go.tgz \
+    && rm /tmp/go.tgz \
+    && go version \
+    && sed "s|^PATH=|PATH=/usr/local/go/bin:|mg" -i /etc/environment
+
+# Install latest Pulumi
+RUN curl -fsSL https://get.pulumi.com | sh \
+    && mv ~/.pulumi/bin/* /usr/local/bin \
+    && pulumi version
 
 # cleanup step
 RUN apt-get -y clean \

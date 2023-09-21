@@ -18,6 +18,10 @@ permissions:
   packages: write
   pull-requests: write
 
+env:
+  IS_NOT_ACT: ${{ github.actor != 'nektos/act' }}
+  IS_PULL_REQUEST: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -38,11 +42,6 @@ jobs:
             distro: 'ubuntu'
             codename: 'focal'
             from-flavor: 'act'
-    services:
-      registry:
-        image: registry:2
-        ports:
-          - 5000:5000
     env:
       BUILDKIT_PROGRESS: plain
       FROM_IMAGE_PATH: /tmp/${{ matrix.distro }}-${{ matrix.from-version }}.tar
@@ -124,7 +123,7 @@ jobs:
       #     platforms: ${{ matrix.platforms }}
       #     labels: ${{ steps.meta.outputs.labels }}
       #     tags: ${{ steps.meta.outputs.tags }}
-      #     # tags: ${{ format('{0}:{1}-{2}', github.actor != 'nektos/act' && env.REGISTRY_IMAGE || env.IMAGE_REPOSITORY, matrix.from-version, github.head_ref || github.ref_name) }}
+      #     # tags: ${{ format('{0}:{1}-{2}', env.IS_NOT_ACT && env.REGISTRY_IMAGE || env.IMAGE_REPOSITORY, matrix.from-version, github.head_ref || github.ref_name) }}
       #     build-args: |
       #       FROM_IMAGE=buildpack-deps
       #       FROM_VERSION_MAJOR=${{ matrix.from-version-major }}
@@ -149,7 +148,7 @@ jobs:
       # Get the architecture to use for the cache tag
       - name: get arch
         id: cache-arch
-        if: github.event_name == 'pull_request'
+        if: env.IS_PULL_REQUEST
         run: >-
           printf "CACHE_ARCH=%s\n" "$(
           docker run
@@ -173,14 +172,14 @@ jobs:
           --cache-from ${{ format('type=registry,ref={0}:cache-{1}-{2}', env.REGISTRY_IMAGE, matrix.codename, 'amd64') }}
           --cache-from ${{ format('type=registry,ref={0}:cache-{1}-{2}', env.REGISTRY_IMAGE, matrix.codename, 'arm64') }}
           --ulimit=nofile=4096:4096
-          ${{ github.event_name == 'pull_request' && format('--cache-to type=registry,ref={0}:cache-{1}-{2},mode=max', env.REGISTRY_IMAGE, matrix.codename, steps.cache-arch.outputs.CACHE_ARCH) || '' }}
+          ${{ (env.IS_PULL_REQUEST && env.IS_NOT_ACT) && format('--cache-to type=registry,ref={0}:cache-{1}-{2},mode=max', env.REGISTRY_IMAGE, matrix.codename, steps.cache-arch.outputs.CACHE_ARCH) || '' }}
           --build-arg FROM_IMAGE='buildpack-deps'
           --build-arg FROM_VERSION_MAJOR='${{ matrix.from-version-major }}'
           --build-arg FROM_VERSION_MINOR='${{ matrix.from-version-minor }}'
           --build-arg CODENAME='${{ matrix.codename }}'
           --build-arg FROM_FLAVOR='${{ matrix.from-flavor }}'
           --build-arg DISTRO='${{ matrix.distro }}'
-          ${{ fromJson(env.IS_MAIN) && '--output=type=registry,push=true' || format('--output=type=docker,dest={0}',  env.FROM_IMAGE_PATH) }}
+          --output=type=${{ env.OUTPUT_TYPE }},${{ env.OUTPUT_KIND }}
           --label org.opencontainers.image.authors='${{ env.TAG_AUTHORS }}'
           --label org.opencontainers.image.description='${{ github.event.repository.description }}'
           --label org.opencontainers.image.documentation='${{ env.REPOSITORY_LINK }}'
@@ -192,6 +191,8 @@ jobs:
           .
         env:
           IS_MAIN: ${{ github.ref == 'refs/heads/main' }}
+          OUTPUT_KIND: ${{ env.IS_MAIN && 'push=true' || format('dest={0}',  env.FROM_IMAGE_PATH) }}
+          OUTPUT_TYPE: ${{ env.IS_MAIN && 'registry' || 'docker' }}
           REGISTRY_IMAGE: ${{ format('{0}/{1}', env.REGISTRY, env.IMAGE_REPOSITORY) }}
           REPOSITORY_LINK: https://github.com/${{ github.repository }}
           TAG_AUTHORS: ${{ format('{0},{1}', env.REPOSITORY_LINK, github.triggering_actor) }}
@@ -201,7 +202,7 @@ jobs:
       - name: Docker Scout
         id: docker-scout
         uses: docker/scout-action@v0.23.4
-        if: github.event_name == 'pull_request'
+        if: env.IS_PULL_REQUEST
         with:
           platform: ${{ matrix.platforms }}
           command: quickview
@@ -210,8 +211,8 @@ jobs:
           to: ${{ env.TO_TAG }}
           ignore-unchanged: true
           only-severities: critical
-          write-comment: ${{ github.actor != 'nektos/act' }}
-          summary: ${{ github.actor != 'nektos/act' }}
+          write-comment: ${{ env.IS_NOT_ACT }}
+          summary: ${{ env.IS_NOT_ACT }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
           organization: ${{ vars.DOCKERHUB_USER || github.repository_owner }}
 
@@ -234,7 +235,7 @@ jobs:
 
       # auto merge dependabot PRs
       - name: Merge DependaBot
-        if: github.actor == 'dependabot[bot]' && github.event_name == 'pull_request' &&  needs.build.result == 'success'
+        if: github.actor == 'dependabot[bot]' &&  needs.build.result == 'success'
         run: gh pr merge --auto --merge "$PR_URL"
         env:
           PR_URL: ${{github.event.pull_request.html_url}}
