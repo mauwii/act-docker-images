@@ -271,8 +271,8 @@ ENV GOLANG_VERSION=1.20.8
 # hadolint ignore=SC2086
 RUN export GOLANG_SHA256_amd64=cc97c28d9c252fbf28f91950d830201aa403836cbed702a05932e63f7f0c7bc4 \
     GOLANG_SHA256_arm64=15ab379c6a2b0d086fe3e74be4599420e66549edf7426a300ee0f3809500f89e \
-    && curl -fsSL https://golang.org/dl/go"${GOLANG_VERSION}".linux-"$(cat /tmp/targetproc)".tar.gz -o /tmp/go.tgz \
-    && go_sha="${go_sha=GOLANG_SHA256_$(cat /tmp/targetproc)}" \
+    && curl -fsSL https://golang.org/dl/go"${GOLANG_VERSION}".linux-"${TARGETARCH}".tar.gz -o /tmp/go.tgz \
+    && go_sha="${go_sha=GOLANG_SHA256_${TARGETARCH}}" \
     && echo "${!go_sha} /tmp/go.tgz" | sha256sum -c - \
     && tar -C /usr/local -xzf /tmp/go.tgz \
     && rm /tmp/go.tgz \
