@@ -23,11 +23,16 @@ runs:
     # will release about 20GB if you don't need .NET
     - name: Remove .NET
       id: dotnet
-      if: fromJson(inputs.deleteDotnet)
+      if: inputs.deleteDotnet && runner.os == 'linux'
       shell: bash
       run: |
         for dir in /usr/share/dotnet /opt/hostedtoolcache/dotnet; do
           if [ -d "${dir}" ]; then
+            printf "will free up "
+            sudo du \
+              --summarize \
+              --human-readable \
+              "${dir}"
             sudo rm -Rf "${dir}"
           fi
         done
@@ -35,9 +40,14 @@ runs:
     # will release about 10 GB if you don't need Android
     - name: Remove android sdk
       id: android
-      if: fromJson(inputs.deleteAndroid)
+      if: inputs.deleteAndroid && runner.os == 'linux'
       shell: bash
       run: |
         if [ -d /usr/local/lib/android ]; then
-          sudo rm -rf /usr/local/lib/android
+          printf "will free up"
+          sudo du \
+            --summarize \
+            --human-readable \
+            /usr/local/lib/android
+          sudo rm -Rf /usr/local/lib/android
         fi
