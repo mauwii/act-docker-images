@@ -18,10 +18,6 @@ permissions:
   packages: write
   pull-requests: write
 
-env:
-  IS_NOT_ACT: ${{ github.actor != 'nektos/act' }}
-  IS_PULL_REQUEST: ${{ github.event_name == 'pull_request' }}
-
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -122,7 +118,7 @@ jobs:
       #     platforms: ${{ matrix.platforms }}
       #     labels: ${{ steps.meta.outputs.labels }}
       #     tags: ${{ steps.meta.outputs.tags }}
-      #     # tags: ${{ format('{0}:{1}-{2}', env.IS_NOT_ACT && env.REGISTRY_IMAGE || env.IMAGE_REPOSITORY, matrix.from-version, github.head_ref || github.ref_name) }}
+      #     # tags: ${{ format('{0}:{1}-{2}', github.actor != 'nektos/act' && env.REGISTRY_IMAGE || env.IMAGE_REPOSITORY, matrix.from-version, github.head_ref || github.ref_name) }}
       #     build-args: |
       #       FROM_IMAGE=buildpack-deps
       #       FROM_VERSION_MAJOR=${{ matrix.from-version-major }}
@@ -147,7 +143,7 @@ jobs:
       # Get the architecture to use for the cache tag
       - name: get arch
         id: cache-arch
-        if: env.IS_PULL_REQUEST
+        if: github.event_name == 'pull_request'
         run: >-
           printf "CACHE_ARCH=%s\n" "$(
           docker run
@@ -158,7 +154,7 @@ jobs:
           /bin/bash -c "dpkg --print-architecture"
           )" >> "$GITHUB_OUTPUT"
         env:
-          PULL_IMAGE: ubuntu:22.04
+          PULL_IMAGE: ${{ format('{0}:{1}', matrix.distro, matrix.codename) }}
 
       # Build and push Docker images
       - name: build image
@@ -171,7 +167,7 @@ jobs:
           --cache-from ${{ format('type=registry,ref={0}:cache-{1}-{2}', env.REGISTRY_IMAGE, matrix.codename, 'amd64') }}
           --cache-from ${{ format('type=registry,ref={0}:cache-{1}-{2}', env.REGISTRY_IMAGE, matrix.codename, 'arm64') }}
           --ulimit=nofile=4096:4096
-          ${{ (env.IS_PULL_REQUEST && env.IS_NOT_ACT) && format('--cache-to type=registry,ref={0}:cache-{1}-{2},mode=max', env.REGISTRY_IMAGE, matrix.codename, steps.cache-arch.outputs.CACHE_ARCH) || '' }}
+          ${{ github.event_name == 'pull_request' && github.actor != 'nektos/act' && format('--cache-to type=registry,ref={0}:cache-{1}-{2},mode=max', env.REGISTRY_IMAGE, matrix.codename, steps.cache-arch.outputs.CACHE_ARCH) || '' }}
           --build-arg FROM_IMAGE='buildpack-deps'
           --build-arg FROM_VERSION_MAJOR='${{ matrix.from-version-major }}'
           --build-arg FROM_VERSION_MINOR='${{ matrix.from-version-minor }}'
@@ -189,9 +185,8 @@ jobs:
           --label org.opencontainers.image.vendor='${{ github.repository_owner }}'
           .
         env:
-          IS_MAIN: ${{ github.ref == 'refs/heads/main' }}
-          OUTPUT_KIND: ${{ env.IS_MAIN && 'push=true' || format('dest={0}',  env.FROM_IMAGE_PATH) }}
-          OUTPUT_TYPE: ${{ env.IS_MAIN && 'registry' || 'docker' }}
+          OUTPUT_KIND: ${{ github.ref == 'refs/heads/main' && 'push=true' || format('dest={0}',  env.FROM_IMAGE_PATH) }}
+          OUTPUT_TYPE: ${{ github.ref == 'refs/heads/main' && 'registry' || 'docker' }}
           REGISTRY_IMAGE: ${{ format('{0}/{1}', env.REGISTRY, env.IMAGE_REPOSITORY) }}
           REPOSITORY_LINK: https://github.com/${{ github.repository }}
           TAG_AUTHORS: ${{ format('{0},{1}', env.REPOSITORY_LINK, github.triggering_actor) }}
@@ -201,7 +196,7 @@ jobs:
       - name: Docker Scout
         id: docker-scout
         uses: docker/scout-action@v0.23.4
-        if: env.IS_PULL_REQUEST
+        if: github.event_name == 'pull_request'
         with:
           platform: ${{ matrix.platforms }}
           command: quickview
@@ -210,8 +205,8 @@ jobs:
           to: ${{ env.TO_TAG }}
           ignore-unchanged: true
           only-severities: critical
-          write-comment: ${{ env.IS_NOT_ACT }}
-          summary: ${{ env.IS_NOT_ACT }}
+          write-comment: ${{ github.actor != 'nektos/act' }}
+          summary: ${{ github.actor != 'nektos/act' }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
           organization: ${{ vars.DOCKERHUB_USER || github.repository_owner }}
 
