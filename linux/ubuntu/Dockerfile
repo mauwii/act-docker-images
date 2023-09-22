@@ -32,7 +32,9 @@ RUN apt-get update \
         locales \
     && rm -rf /var/lib/apt/lists/* \
     && localedef -i en_US -c -f UTF-8 -A /usr/share/locale/locale.alias en_US.UTF-8
-ENV LANG en_US.utf8
+ENV LANG=en_US.UTF-8 \
+    LANGUAGE=en_US:en \
+    LC_ALL=en_US.UTF-8
 
 # enable pipefail and set workdir
 SHELL [ "/bin/bash", "--login", "-e", "-o", "pipefail", "-c" ]
@@ -46,7 +48,8 @@ RUN export targetarch=${TARGETARCH} \
 # setup environment
 ENV AGENT_TOOLSDIRECTORY=/opt/hostedtoolcache \
     AZURE_EXTENSION_DIR=/opt/az/azcliextensions
-RUN sed 's|"||g' -i "/etc/environment" \
+RUN locale | tee -a /etc/environment \
+    && sed 's|"||g' -i "/etc/environment" \
     && echo "IMAGE_OS=${DISTRO}${FROM_VERSION_MAJOR}" | tee -a /etc/environment \
     && echo "ImageOS=${DISTRO}${FROM_VERSION_MAJOR}" | tee -a /etc/environment \
     && echo "LSB_RELEASE=${FROM_VERSION}" | tee -a /etc/environment \
@@ -64,7 +67,7 @@ RUN ssh-keyscan github.com >>/etc/ssh/ssh_known_hosts \
     && ssh-keyscan ssh.dev.azure.com >>/etc/ssh/ssh_known_hosts
 
 # Install dependencies
-RUN apt-get -y update &> /dev/null \
+RUN apt-get -y update &>/dev/null \
     && packages=(gawk sudo jq gnupg-agent ca-certificates software-properties-common apt-transport-https zstd zip unzip xz-utils) \
     && apt-get -y install --no-install-recommends \
         "${packages[@]}" \
@@ -82,7 +85,7 @@ RUN bash -c "$(curl -fsSL https://raw.githubusercontent.com/ilikenwf/apt-fast/ma
 # Install current version of git
 # hadolint ignore=SC2035
 RUN add-apt-repository -y ppa:git-core/ppa \
-    && apt-get -y update &> /dev/null \
+    && apt-get -y update &>/dev/null \
     && apt-get -y install --no-install-recommends \
         git \
     && printf "[safe]\n\tdirectory = *\n" | tee -a /etc/gitconfig \
@@ -101,8 +104,9 @@ RUN curl -Ls https://packagecloud.io/install/repositories/github/git-lfs/script.
 # Install docker cli
 RUN echo "deb https://packages.microsoft.com/ubuntu/$(lsb_release -rs)/prod $(lsb_release -cs) main" \
     | tee /etc/apt/sources.list.d/microsoft-prod.list \
-    && curl -fsSL https://packages.microsoft.com/keys/microsoft.asc | apt-key add - \
-    && apt-get -y update &> /dev/null \
+    && curl -fsSL https://packages.microsoft.com/keys/microsoft.asc \
+    | gpg --dearmour -o /etc/apt/trusted.gpg.d/microsoft.gpg \
+    && apt-get -y update &>/dev/null \
     && apt-get -y install --no-install-recommends \
         moby-cli \
         moby-buildx \
@@ -132,7 +136,7 @@ RUN printf "Package: *net*\nPin: origin packages.microsoft.com\nPin-Priority: 10
     && deps=("libc6" "libgcc1" "libgssapi-krb5-2" "libstdc++6" "zlib1g") \
     && if [ "${FROM_VERSION}" = "20.04" ]; then deps+=("libicu66" "libssl1.1"); fi \
     && if [ "${FROM_VERSION}" = "22.04" ]; then deps+=("libicu70" "libssl3" "libunwind8"); fi \
-    && apt-get -y update &> /dev/null \
+    && apt-get -y update &>/dev/null \
     && apt-get -y install --no-install-recommends \
         "${deps[@]}" \
     && curl -fsSL https://dot.net/v1/dotnet-install.sh | bash -s -- \
@@ -169,7 +173,7 @@ RUN curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
     && chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg \
     && echo "deb [arch=${TARGETARCH} signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" \
     | tee /etc/apt/sources.list.d/github-cli.list >/dev/null \
-    && apt-get -y update &> /dev/null \
+    && apt-get -y update &>/dev/null \
     && apt-get -y install --no-install-recommends \
         gh \
     && apt-get clean \
@@ -178,10 +182,9 @@ RUN curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
 
 # Install Azure CLI
 RUN [[ $(curl -sL https://packages.microsoft.com/repos/azure-cli/dists/) =~ $(lsb_release -cs) ]] \
-    && (curl -fsSL https://packages.microsoft.com/keys/microsoft.asc | apt-key add - \
-        && echo "deb [arch=$(dpkg --print-architecture)] https://packages.microsoft.com/repos/azure-cli/ $(lsb_release -cs) main" \
+    && (echo "deb [arch=$(dpkg --print-architecture)] https://packages.microsoft.com/repos/azure-cli/ $(lsb_release -cs) main" \
         | tee /etc/apt/sources.list.d/azure.list \
-        && apt-get -y update &> /dev/null \
+        && apt-get -y update &>/dev/null \
         && apt-get -y install --no-install-recommends \
             azure-cli \
         && az extension add -n azure-devops \
@@ -206,7 +209,7 @@ COPY linux/${DISTRO}/toolsets/${FROM_VERSION_MAJOR}${FROM_VERSION_MINOR}.json ${
 
 # install apt packages from toolset
 # hadolint ignore=SC2207
-RUN apt-get -y update &> /dev/null \
+RUN apt-get -y update &>/dev/null \
     && packages=() \
     && while IFS='' read -r line; do packages+=("${line}"); done < <(jq -r '.apt|.vital_packages[],.common_packages[],.cmd_packages[]' ${TOOLSET}) \
     && apt-get -y install --no-install-recommends \
@@ -221,7 +224,21 @@ RUN curl -fsSL https://raw.githubusercontent.com/tj/n/master/bin/n -o ~/n \
     && bash ~/n "${defaultVersion}" \
     && rm -rf ~/n \
     && chmod -R 777 /usr/local/lib/node_modules \
-    && chmod -R 777 /usr/local/bin
+    && chmod -R 777 /usr/local/bin \
+    && npm --version
+
+# Install YARN
+RUN curl -sS https://dl.yarnpkg.com/debian/pubkey.gpg \
+    | apt-key add - \
+    && echo "deb https://dl.yarnpkg.com/debian/ stable main" \
+    | tee /etc/apt/sources.list.d/yarn.list \
+    && apt-get -y update \
+    && apt-get -y install --no-install-recommends \
+        yarn \
+    && apt-get clean \
+    && rm -rf /etc/apt/sources.list.d/* \
+    && rm -rf /var/lib/apt/lists/* \
+    && yarn --version
 
 # Trust PSGallery and install Powershell-/Azure Modules
 RUN pwsh -NonInteractive -Command "Set-PSRepository -Name PSGallery -InstallationPolicy Trusted" \
@@ -232,7 +249,7 @@ RUN pwsh -NonInteractive -Command "Set-PSRepository -Name PSGallery -Installatio
 ENV PIPX_BIN_DIR=/opt/pipx_bin \
     PIPX_HOME=/opt/pipx
 # kics-scan ignore-block
-RUN apt-get -y update &> /dev/null \
+RUN apt-get -y update &>/dev/null \
     && apt-get -y install --no-install-recommends \
         python3 \
         python3-dev \
@@ -253,7 +270,9 @@ ENV PATH=/usr/local/go/bin:${PATH}
 ARG GOLANG_VERSION=1.20.8
 ARG GOLANG_SHA256_amd64=cc97c28d9c252fbf28f91950d830201aa403836cbed702a05932e63f7f0c7bc4
 ARG GOLANG_SHA256_arm64=15ab379c6a2b0d086fe3e74be4599420e66549edf7426a300ee0f3809500f89e
-RUN curl -fsSLo /tmp/go.tgz "https://golang.org/dl/go${GOLANG_VERSION}.linux-$(cat /tmp/targetproc).tar.gz" \
+# hadolint ignore=SC2086
+RUN printf -v GOLANG_URL "https://golang.org/dl/go%s.linux-%s.tar.gz" "${GOLANG_VERSION}" "$(cat /tmp/targetproc)" \
+    && curl -fsSL ${GOLANG_URL} -o /tmp/go.tgz \
     && go_sha="${go_sha=GOLANG_SHA256_$(cat /tmp/targetproc)}" \
     && echo "${!go_sha} /tmp/go.tgz" | sha256sum -c - \
     && tar -C /usr/local -xzf /tmp/go.tgz \
