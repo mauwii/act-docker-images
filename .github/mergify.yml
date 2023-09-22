@@ -1,5 +1,3 @@
-# yaml-language-server: $schema=https://docs.mergify.com/config/openapi.json
-
 pull_request_rules:
   - name: automatic merge for Dependabot pull requests
     conditions:
