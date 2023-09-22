@@ -267,11 +267,11 @@ ENV PATH=${PIPX_BIN_DIR}:${PATH}
 
 # Install Go
 ENV PATH=/usr/local/go/bin:${PATH}
-ARG GOLANG_VERSION=1.20.8
-ARG GOLANG_SHA256_amd64=cc97c28d9c252fbf28f91950d830201aa403836cbed702a05932e63f7f0c7bc4
-ARG GOLANG_SHA256_arm64=15ab379c6a2b0d086fe3e74be4599420e66549edf7426a300ee0f3809500f89e
+ENV GOLANG_VERSION=1.20.8
 # hadolint ignore=SC2086
-RUN printf -v GOLANG_URL "https://golang.org/dl/go%s.linux-%s.tar.gz" "${GOLANG_VERSION}" "$(cat /tmp/targetproc)" \
+RUN export GOLANG_SHA256_amd64=cc97c28d9c252fbf28f91950d830201aa403836cbed702a05932e63f7f0c7bc4 \
+    GOLANG_SHA256_arm64=15ab379c6a2b0d086fe3e74be4599420e66549edf7426a300ee0f3809500f89e \
+    && printf -v GOLANG_URL "https://golang.org/dl/go%s.linux-%s.tar.gz" "${GOLANG_VERSION}" "$(cat /tmp/targetproc)" \
     && curl -fsSL ${GOLANG_URL} -o /tmp/go.tgz \
     && go_sha="${go_sha=GOLANG_SHA256_$(cat /tmp/targetproc)}" \
     && echo "${!go_sha} /tmp/go.tgz" | sha256sum -c - \
