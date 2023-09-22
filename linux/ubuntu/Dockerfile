@@ -32,9 +32,12 @@ RUN apt-get update \
         locales \
     && rm -rf /var/lib/apt/lists/* \
     && localedef -i en_US -c -f UTF-8 -A /usr/share/locale/locale.alias en_US.UTF-8
+
 ENV LANG=en_US.UTF-8 \
     LANGUAGE=en_US:en \
-    LC_ALL=en_US.UTF-8
+    LC_ALL=en_US.UTF-8 \
+    RUNNER_MANUALLY_TRAP_SIG=1 \
+    ACTIONS_RUNNER_PRINT_LOG_TO_STDOUT=1
 
 # enable pipefail and set workdir
 SHELL [ "/bin/bash", "--login", "-e", "-o", "pipefail", "-c" ]
@@ -59,7 +62,9 @@ RUN locale | tee -a /etc/environment \
     && echo "DEPLOYMENT_BASEPATH=/opt/runner" | tee -a /etc/environment \
     && echo "LSB_OS_VERSION=${FROM_VERSION_MAJOR}${FROM_VERSION_MINOR}" | tee -a /etc/environment \
     && echo "USER=$(whoami)" | tee -a /etc/environment \
-    && echo "RUNNER_USER=$(whoami)" | tee -a /etc/environment
+    && echo "RUNNER_USER=$(whoami)" | tee -a /etc/environment \
+    && echo "RUNNER_MANUALLY_TRAP_SIG=${RUNNER_MANUALLY_TRAP_SIG}" | tee -a /etc/environment \
+    && echo "ACTIONS_RUNNER_PRINT_LOG_TO_STDOUT=${ACTIONS_RUNNER_PRINT_LOG_TO_STDOUT}" | tee -a /etc/environment
 
 # add ssh keys of github and azure devops
 # hadolint ignore=SC2174
@@ -267,10 +272,10 @@ ENV PATH=${PIPX_BIN_DIR}:${PATH}
 
 # Install Go
 ENV PATH=/usr/local/go/bin:${PATH}
-ENV GOLANG_VERSION=1.20.8
 # hadolint ignore=SC2086
 RUN export GOLANG_SHA256_amd64=cc97c28d9c252fbf28f91950d830201aa403836cbed702a05932e63f7f0c7bc4 \
     GOLANG_SHA256_arm64=15ab379c6a2b0d086fe3e74be4599420e66549edf7426a300ee0f3809500f89e \
+    GOLANG_VERSION=1.20.8 \
     && curl -fsSL https://golang.org/dl/go"${GOLANG_VERSION}".linux-"${TARGETARCH}".tar.gz -o /tmp/go.tgz \
     && go_sha="${go_sha=GOLANG_SHA256_${TARGETARCH}}" \
     && echo "${!go_sha} /tmp/go.tgz" | sha256sum -c - \
@@ -292,9 +297,6 @@ RUN apt-get -y clean \
         /var/lib/apt/lists/* \
         /tmp/* \
     || echo 'Failed to delete directories'
-
-ARG RUNNER
-USER ${RUNNER}
 
 # No idea how to do a healthcheck for this image
 HEALTHCHECK NONE
