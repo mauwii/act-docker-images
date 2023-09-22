@@ -298,5 +298,8 @@ RUN apt-get -y clean \
         /tmp/* \
     || echo 'Failed to delete directories'
 
+ARG RUNNER
+USER ${RUNNER}
+
 # No idea how to do a healthcheck for this image
 HEALTHCHECK NONE
