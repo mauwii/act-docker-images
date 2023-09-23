@@ -6,7 +6,8 @@
     "**/.vscode/**",
     "**/tmp/**",
     "**/megalinter-reports/**",
-    "**/.editorconfig"
+    "**/.editorconfig",
+    "**.hcl"
   ],
   "language": "en,en-GB",
   "words": [
