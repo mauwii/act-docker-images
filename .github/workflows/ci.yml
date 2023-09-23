@@ -17,19 +17,66 @@ permissions:
   packages: write
   pull-requests: write
 
+env:
+  REGISTRY: ${{ vars.DOCKERHUB_USER && 'docker.io' || 'ghcr.io' }}
+  SHA: ${{ github.event.pull_request.head.sha || github.event.after || github.sha }}
+
 jobs:
+  test:
+    runs-on: ubuntu-latest
+    env:
+      REGISTRY: ${{ vars.DOCKERHUB_USER && 'docker.io' || 'ghcr.io' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3.0.0
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3.0.0
+
+      - name: get docker binary path
+        id: docker-binary-path
+        run: echo "DOCKER_BINARY_PATH=$(which docker)" >> "$GITHUB_OUTPUT"
+
+      - name: bake-file with empty env
+        id: bake-file-no-env
+        run: env -i ${{ steps.docker-binary-path.outputs.DOCKER_BINARY_PATH }} buildx bake --print
+
+      - name: verify tag ends on -local
+        run: |
+          BAKE_TAG="$(env -i ${{ steps.docker-binary-path.outputs.DOCKER_BINARY_PATH }} buildx bake --print  | jq -r '[.target[].tags[]][0]')"
+          [[ "${BAKE_TAG}" == *"-local" ]] || exit 1
+
+      # - name: bake-file with test ref
+      #   id: bake-file-test-tag
+      #   run: printf "BAKE_OUTPUT=%s\n" "$(env -i ${{ steps.docker-binary-path.outputs.DOCKER_BINARY_PATH }} buildx bake --print | jq -c)" >> "$GITHUB_OUTPUT"
+      #   env:
+      #     GITHUB_BASE_REF: 'test'
+
+      # - name: verify tag ends on -test
+      #   run: |
+      #     BAKE_TAG="$(echo '${{ steps.bake-file-test-tag.outputs.BAKE_OUTPUT }}' | jq -r '[.target[].tags[]][0]')"
+      #     [[ "${BAKE_TAG}" == *"-test" ]] || exit 1
+
+      - name: bake-file
+        run: docker buildx bake --print
+        env:
+          GITHUB_SHA: ${{ env.SHA }}
+
+      - name: validate tag
+        run: |
+          BAKE_TAG="$(docker buildx bake --print | jq -r '[.target[].tags[]][0]')"
+          [[ "${BAKE_TAG}" == *"-${{ github.ref_name}}" ]] || exit 1
+
   build:
+    needs: test
     runs-on: ubuntu-latest
     strategy:
       matrix:
         platforms: ${{ github.event_name == 'pull_request' && fromJson('["linux/amd64", "linux/arm64"]') || fromJson('["linux/amd64,linux/arm64"]') }}
     env:
       BUILDKIT_PROGRESS: plain
-      # FROM_IMAGE_PATH: /tmp/${{ matrix.distro }}-${{ matrix.from-version }}.tar
-      # IMAGE_NAME: ${{ format('{0}-{1}', matrix.distro, matrix.from-flavor) }}
-      # IMAGE_REPOSITORY: ${{ format('{0}/{1}-{2}', vars.DOCKERHUB_USER || github.repository_owner, matrix.distro, matrix.from-flavor) }}
-      REGISTRY: ${{ vars.DOCKERHUB_USER && 'docker.io' || 'ghcr.io' }}
-      SHA: ${{ github.event.pull_request.head.sha || github.event.after || github.sha }}
       # TO_TAG: ${{ format('{0}/{1}/{2}-{3}:{4}', 'docker.io', vars.DOCKERHUB_USER, matrix.distro, matrix.from-flavor, matrix.from-version) }}
     steps:
       - uses: actions/checkout@v4
