@@ -23,28 +23,14 @@ jobs:
     strategy:
       matrix:
         platforms: ${{ github.event_name == 'pull_request' && fromJson('["linux/amd64", "linux/arm64"]') || fromJson('["linux/amd64,linux/arm64"]') }}
-        from-version: ['22.04', '20.04']
-        include:
-          - from-version: '22.04'
-            from-version-major: '22'
-            from-version-minor: '04'
-            distro: 'ubuntu'
-            codename: 'jammy'
-            from-flavor: 'act'
-          - from-version: '20.04'
-            from-version-major: '20'
-            from-version-minor: '04'
-            distro: 'ubuntu'
-            codename: 'focal'
-            from-flavor: 'act'
     env:
       BUILDKIT_PROGRESS: plain
-      FROM_IMAGE_PATH: /tmp/${{ matrix.distro }}-${{ matrix.from-version }}.tar
-      IMAGE_NAME: ${{ format('{0}-{1}', matrix.distro, matrix.from-flavor) }}
-      IMAGE_REPOSITORY: ${{ format('{0}/{1}-{2}', vars.DOCKERHUB_USER || github.repository_owner, matrix.distro, matrix.from-flavor) }}
+      # FROM_IMAGE_PATH: /tmp/${{ matrix.distro }}-${{ matrix.from-version }}.tar
+      # IMAGE_NAME: ${{ format('{0}-{1}', matrix.distro, matrix.from-flavor) }}
+      # IMAGE_REPOSITORY: ${{ format('{0}/{1}-{2}', vars.DOCKERHUB_USER || github.repository_owner, matrix.distro, matrix.from-flavor) }}
       REGISTRY: ${{ vars.DOCKERHUB_USER && 'docker.io' || 'ghcr.io' }}
       SHA: ${{ github.event.pull_request.head.sha || github.event.after || github.sha }}
-      TO_TAG: ${{ format('{0}/{1}/{2}-{3}:{4}', 'docker.io', vars.DOCKERHUB_USER, matrix.distro, matrix.from-flavor, matrix.from-version) }}
+      # TO_TAG: ${{ format('{0}/{1}/{2}-{3}:{4}', 'docker.io', vars.DOCKERHUB_USER, matrix.distro, matrix.from-flavor, matrix.from-version) }}
     steps:
       - uses: actions/checkout@v4
 
@@ -61,7 +47,7 @@ jobs:
         uses: docker/setup-buildx-action@v3.0.0
         with:
           driver: docker-container
-          driver-opts: image=moby/buildkit:v0.12.2,network=host
+          driver-opts: image=moby/buildkit:v0.12.2
           install: true
           use: true
           cleanup: true
@@ -77,48 +63,21 @@ jobs:
           password: ${{ secrets.DOCKERHUB_TOKEN || secrets.GITHUB_TOKEN }}
           logout: true
 
-      # Extract metadata (tags, labels) for Docker
-      # https://github.com/docker/metadata-action
-      - name: Extract Docker metadata
-        id: meta
-        uses: docker/metadata-action@v5.0.0
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          images: ${{ github.actor == 'nektos/act' && env.IMAGE_REPOSITORY || env.REGISTRY_IMAGE }}
-          tags: |
-            type=sha,prefix=${{ matrix.from-version }}-,format=short,enable=${{ github.ref == 'refs/heads/main' }},priority=1000
-            type=raw,value=${{ matrix.from-version }},enable=${{ github.ref == 'refs/heads/main' }},priority=900
-            type=raw,value=${{ matrix.from-version }}-${{ github.head_ref || github.ref_name }},priority=600
-          flavor: |
-            latest=${{ github.ref == 'refs/heads/main' && matrix.from-version == '22.04' }}
-          labels: |
-            org.opencontainers.image.authors='${{ env.REPOSITORY_LINK }},${{ github.actor }}'
-            org.opencontainers.image.description=${{ github.event.repository.description }}
-            org.opencontainers.image.documentation=${{ env.REPOSITORY_LINK }}
-            org.opencontainers.image.revision=${{ env.SHA }}
-            org.opencontainers.image.source=${{ github.repositoryUrl }}
-            org.opencontainers.image.title=${{ env.IMAGE_REPOSITORY }}:${{ matrix.from-version }}-${{ github.head_ref || github.ref_name }}
-            org.opencontainers.image.url=${{ env.REPOSITORY_LINK }}/blob/${{ env.SHA }}/linux/${{ matrix.distro }}/Dockerfile
-            org.opencontainers.image.vendor=${{ github.repository_owner }}
-        env:
-          REGISTRY_IMAGE: ${{ format('{0}/{1}', env.REGISTRY, env.IMAGE_REPOSITORY) }}
-          REPOSITORY_LINK: https://github.com/${{ github.repository }}
-
-      # Get the architecture to use for the cache tag
-      - name: get arch
-        id: cache-arch
-        if: github.event_name == 'pull_request'
-        run: >-
-          printf "CACHE_ARCH=%s\n" "$(
-          docker run
-          --quiet
-          --platform ${{ matrix.platforms }}
-          --rm
-          "${PULL_IMAGE}"
-          /bin/bash -c "dpkg --print-architecture"
-          )" >> "$GITHUB_OUTPUT"
-        env:
-          PULL_IMAGE: ${{ format('{0}:{1}', matrix.distro, matrix.codename) }}
+      # # Get the architecture to use for the cache tag
+      # - name: get arch
+      #   id: cache-arch
+      #   if: github.event_name == 'pull_request'
+      #   run: >-
+      #     printf "CACHE_ARCH=%s\n" "$(
+      #     docker run
+      #     --quiet
+      #     --platform ${{ matrix.platforms }}
+      #     --rm
+      #     "${PULL_IMAGE}"
+      #     /bin/bash -c "dpkg --print-architecture"
+      #     )" >> "$GITHUB_OUTPUT"
+      #   env:
+      #     PULL_IMAGE: ${{ format('{0}:{1}', matrix.distro, matrix.codename) }}
 
       - name: Build and Push
         uses: docker/bake-action@v4.0.0
@@ -127,29 +86,29 @@ jobs:
           set: |
             ubuntu*.platform=${{ matrix.platforms }}
             ubuntu*.output=type=${{ env.OUTPUT_TYPE }},${{ env.OUTPUT_KIND }}
-            ${{ github.event_name == 'pull_request' && github.actor != 'nektos/act' && format('--set *.cache-to=type=registry,ref={0}:cache-{1}-{2},mode=max', env.REGISTRY_IMAGE, matrix.codename, steps.cache-arch.outputs.CACHE_ARCH) || '' }}
+            ${{ github.event_name == 'pull_request' && github.actor != 'nektos/act' && '*.cache-to=type=registry,mode=max' || '' }}
         env:
           OUTPUT_KIND: ${{ github.event_name != 'pull_request' && 'push=true' || format('dest={0}',  env.FROM_IMAGE_PATH) }}
           OUTPUT_TYPE: ${{ github.event_name != 'pull_request' && 'registry' || 'docker' }}
-          REGISTRY_IMAGE: ${{ format('{0}/{1}', env.REGISTRY, env.IMAGE_REPOSITORY) }}
+          # REGISTRY_IMAGE: ${{ format('{0}/{1}', env.REGISTRY, env.IMAGE_REPOSITORY) }}
 
-      # vulnerability scanning to verify PRs
-      - name: Docker Scout
-        id: docker-scout
-        uses: docker/scout-action@v0.23.4
-        if: github.event_name == 'pull_request'
-        with:
-          platform: ${{ matrix.platforms }}
-          command: quickview
-          image: ${{ env.FROM_IMAGE_PATH }}
-          type: archive
-          to: ${{ env.TO_TAG }}
-          ignore-unchanged: true
-          only-severities: critical
-          write-comment: ${{ github.actor != 'nektos/act' }}
-          summary: ${{ github.actor != 'nektos/act' }}
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          organization: ${{ vars.DOCKERHUB_USER || github.repository_owner }}
+      # # vulnerability scanning to verify PRs
+      # - name: Docker Scout
+      #   id: docker-scout
+      #   uses: docker/scout-action@v0.23.4
+      #   if: github.event_name == 'pull_request'
+      #   with:
+      #     platform: ${{ matrix.platforms }}
+      #     command: quickview
+      #     image: ${{ env.FROM_IMAGE_PATH }}
+      #     type: archive
+      #     to: ${{ env.TO_TAG }}
+      #     ignore-unchanged: true
+      #     only-severities: critical
+      #     write-comment: ${{ github.actor != 'nektos/act' }}
+      #     summary: ${{ github.actor != 'nektos/act' }}
+      #     github-token: ${{ secrets.GITHUB_TOKEN }}
+      #     organization: ${{ vars.DOCKERHUB_USER || github.repository_owner }}
 
   approve-pr:
     name: Approve PR

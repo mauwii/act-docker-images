@@ -10,12 +10,16 @@ variable "REPOSITORY" {
   default = "${REPOSITORY_OWNER}/act-docker-images"
 }
 
+variable "REPOSITORY_URL" {
+  default = "https://github.com/${REPOSITORY}"
+}
+
 variable "GITHUB_SHA" {
   default = null
 }
 
 variable "REF_NAME" {
-  default = notequal(GITHUB_BASE_REF, "") ? "${GITHUB_BASE_REF}" : "${GITHUB_REF_NAME}"
+  default = notequal(GITHUB_BASE_REF, null) ? "${GITHUB_BASE_REF}" : notequal(GITHUB_REF_NAME, null) ? "${GITHUB_REF_NAME}" : "local"
 }
 
 variable "GITHUB_REF_NAME" {
@@ -82,17 +86,22 @@ target "ubuntu" {
   cache-from = [
     "${REGISTRY}/${REPOSITORY_OWNER}/ubuntu-act:cache-${distro.codename}-amd64",
     "${REGISTRY}/${REPOSITORY_OWNER}/ubuntu-act:cache-${distro.codename}-arm64",
-    "${REGISTRY}/${REPOSITORY_OWNER}/ubuntu-act:cache-${distro.codename}",
+    notequal(REF_NAME, "local") ? "${REGISTRY}/${REPOSITORY_OWNER}/ubuntu-act:${distro.major}.${distro.minor}-${REF_NAME}" : "",
   ]
   tags = [
     "${REGISTRY}/${REPOSITORY_OWNER}/ubuntu-act:${distro.major}.${distro.minor}-${REF_NAME}",
-    notequal(GITHUB_SHA,"") ? "${REGISTRY}/${REPOSITORY_OWNER}/ubuntu-act:${distro.major}.${distro.minor}-${substr(GITHUB_SHA, 0, 7)}" : "",
+    and(notequal(GITHUB_SHA,null),equal("${REF_NAME}", "main")) ? "${REGISTRY}/${REPOSITORY_OWNER}/ubuntu-act:${distro.major}.${distro.minor}-${substr(GITHUB_SHA, 0, 7)}" : "",
     equal("${REF_NAME}", "main") ? "${REGISTRY}/${REPOSITORY_OWNER}/ubuntu-act:${distro.major}.${distro.minor}" : "",
     and(equal("${REF_NAME}", "main"),equal(distro.codename, "jammy")) ? "${REGISTRY}/${REPOSITORY_OWNER}/ubuntu-act:latest" : "",
   ]
   labels = {
-    "org.opencontainers.image.source" = "https://github.com/${REPOSITORY}"
+    "org.opencontainers.image.authors" = "${REPOSITORY_OWNER}"
+    "org.opencontainers.image.description" = "This Image is made to be used with Nektos/act to run your GH-Workflows locally"
+    "org.opencontainers.image.documentation" = "${REPOSITORY_URL}"
     "org.opencontainers.image.revision" = "${GITHUB_SHA}"
+    "org.opencontainers.image.source" = and(notequal(REPOSITORY_URL, null), notequal(GITHUB_SHA, null)) ? "${REPOSITORY_URL}/blob/${GITHUB_SHA}/linux/ubuntu/Dockerfile" : null
+    "org.opencontainers.image.title" = "ubuntu-act:${distro.codename}-${REF_NAME}"
+    "org.opencontainers.image.url" = equal("${REGISTRY}", "docker.io") ? "https://hub.docker.com/r/${REPOSITORY_OWNER}/ubuntu-act" :  equal("${REGISTRY}", "ghcr.io") ? "https://github.com/${REPOSITORY}/pkgs/container/ubuntu-act" : null
     "org.opencontainers.image.vendor" = "${REPOSITORY_OWNER}"
   }
 }

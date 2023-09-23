@@ -20,7 +20,7 @@ inputs:
 runs:
   using: 'composite'
   steps:
-    # will release about 20GB if you don't need .NET
+    # will release about 2GB if you don't need .NET
     - name: Remove .NET
       id: dotnet
       if: inputs.deleteDotnet && runner.os == 'linux'
@@ -37,7 +37,7 @@ runs:
           fi
         done
 
-    # will release about 10 GB if you don't need Android
+    # will release about 13GB if you don't need Android
     - name: Remove android sdk
       id: android
       if: inputs.deleteAndroid && runner.os == 'linux'
