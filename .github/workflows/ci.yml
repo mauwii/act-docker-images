@@ -105,41 +105,6 @@ jobs:
           REGISTRY_IMAGE: ${{ format('{0}/{1}', env.REGISTRY, env.IMAGE_REPOSITORY) }}
           REPOSITORY_LINK: https://github.com/${{ github.repository }}
 
-      # # Build and push Docker image with Buildx (don't push on PR)
-      # # https://github.com/docker/build-push-action
-      # - name: Build and push
-      #   id: build
-      #   uses: docker/build-push-action@v4
-      #   with:
-      #     context: .
-      #     # github-token for the repository context
-      #     github-token: ${{ secrets.GITHUB_TOKEN }}
-      #     file: ./linux/${{ matrix.distro }}/Dockerfile
-      #     platforms: ${{ matrix.platforms }}
-      #     labels: ${{ steps.meta.outputs.labels }}
-      #     tags: ${{ steps.meta.outputs.tags }}
-      #     # tags: ${{ format('{0}:{1}-{2}', github.actor != 'nektos/act' && env.REGISTRY_IMAGE || env.IMAGE_REPOSITORY, matrix.from-version, github.head_ref || github.ref_name) }}
-      #     build-args: |
-      #       FROM_IMAGE=buildpack-deps
-      #       FROM_VERSION_MAJOR=${{ matrix.from-version-major }}
-      #       FROM_VERSION_MINOR=${{ matrix.from-version-minor }}
-      #       FROM_FLAVOR=${{ matrix.from-flavor }}
-      #       DISTRO=${{ matrix.distro }}
-      #       CODENAME=${{ matrix.codename }}
-      #     # caching to speed up the build
-      #     cache-from: |
-      #       ${{ format('type=registry,ref={0}:{1}', env.REGISTRY_IMAGE, matrix.from-version) }}
-      #       ${{ format('type=registry,ref={0}:cache-{1}', env.REGISTRY_IMAGE, matrix.codename) }}
-      #     # don't export cache on PR
-      #     cache-to: ${{ github.ref == 'refs/heads/main' && format('type=registry,ref={0}:cache-{1},mode=max', env.REGISTRY_IMAGE, matrix.codename) || '' }}
-      #     # this will give us some useful information about the build
-      #     push: ${{ github.ref == 'refs/heads/main' }}
-      #     provenance: mode=max
-      #     # push if not building with act
-      #     outputs: 'type=oci,dest=${{ env.FROM_IMAGE_PATH }}'
-      #   env:
-      #     REGISTRY_IMAGE: ${{ format('{0}/{1}', env.REGISTRY, env.IMAGE_REPOSITORY) }}
-
       # Get the architecture to use for the cache tag
       - name: get arch
         id: cache-arch
@@ -156,41 +121,18 @@ jobs:
         env:
           PULL_IMAGE: ${{ format('{0}:{1}', matrix.distro, matrix.codename) }}
 
-      # Build and push Docker images
-      - name: build image
-        run: >-
-          while IFS='' read -r line; do tags+=(-t "${line}"); done < <(echo "${DOCKER_METADATA_OUTPUT_JSON}" | jq -r '.tags[]')
-          && docker build "${tags[@]}"
-          --file linux/${{ matrix.distro }}/Dockerfile
-          --platform ${{ matrix.platforms }}
-          --cache-from ${{ format('type=registry,ref={0}:{1}', env.REGISTRY_IMAGE, matrix.from-version) }}
-          --cache-from ${{ format('type=registry,ref={0}:cache-{1}-{2}', env.REGISTRY_IMAGE, matrix.codename, 'amd64') }}
-          --cache-from ${{ format('type=registry,ref={0}:cache-{1}-{2}', env.REGISTRY_IMAGE, matrix.codename, 'arm64') }}
-          --ulimit=nofile=4096:4096
-          ${{ github.event_name == 'pull_request' && github.actor != 'nektos/act' && format('--cache-to type=registry,ref={0}:cache-{1}-{2},mode=max', env.REGISTRY_IMAGE, matrix.codename, steps.cache-arch.outputs.CACHE_ARCH) || '' }}
-          --build-arg FROM_IMAGE='buildpack-deps'
-          --build-arg FROM_VERSION_MAJOR='${{ matrix.from-version-major }}'
-          --build-arg FROM_VERSION_MINOR='${{ matrix.from-version-minor }}'
-          --build-arg CODENAME='${{ matrix.codename }}'
-          --build-arg FROM_FLAVOR='${{ matrix.from-flavor }}'
-          --build-arg DISTRO='${{ matrix.distro }}'
-          --output=type=${{ env.OUTPUT_TYPE }},${{ env.OUTPUT_KIND }}
-          --label org.opencontainers.image.authors='${{ env.TAG_AUTHORS }}'
-          --label org.opencontainers.image.description='${{ github.event.repository.description }}'
-          --label org.opencontainers.image.documentation='${{ env.REPOSITORY_LINK }}'
-          --label org.opencontainers.image.revision='${{ env.SHA }}'
-          --label org.opencontainers.image.source='${{ github.repositoryUrl }}'
-          --label org.opencontainers.image.title='${{ env.TITLE_TAG }}'
-          --label org.opencontainers.image.url='${{ env.REPOSITORY_LINK }}/blob/${{ env.SHA }}/linux/${{ matrix.distro }}/Dockerfile'
-          --label org.opencontainers.image.vendor='${{ github.repository_owner }}'
-          .
+      - name: Build and Push
+        uses: docker/bake-action@v4.0.0
+        with:
+          files: docker-bake.hcl
+          set: |
+            ubuntu*.platform=${{ matrix.platforms }}
+            ubuntu*.output=type=${{ env.OUTPUT_TYPE }},${{ env.OUTPUT_KIND }}
+            ${{ github.event_name == 'pull_request' && github.actor != 'nektos/act' && format('--set *.cache-to=type=registry,ref={0}:cache-{1}-{2},mode=max', env.REGISTRY_IMAGE, matrix.codename, steps.cache-arch.outputs.CACHE_ARCH) || '' }}
         env:
-          OUTPUT_KIND: ${{ github.ref == 'refs/heads/main' && 'push=true' || format('dest={0}',  env.FROM_IMAGE_PATH) }}
-          OUTPUT_TYPE: ${{ github.ref == 'refs/heads/main' && 'registry' || 'docker' }}
+          OUTPUT_KIND: ${{ github.event_name != 'pull_request' && 'push=true' || format('dest={0}',  env.FROM_IMAGE_PATH) }}
+          OUTPUT_TYPE: ${{ github.event_name != 'pull_request' && 'registry' || 'docker' }}
           REGISTRY_IMAGE: ${{ format('{0}/{1}', env.REGISTRY, env.IMAGE_REPOSITORY) }}
-          REPOSITORY_LINK: https://github.com/${{ github.repository }}
-          TAG_AUTHORS: ${{ format('{0},{1}', env.REPOSITORY_LINK, github.triggering_actor) }}
-          TITLE_TAG: ${{ format('{0}:{1}', env.IMAGE_REPOSITORY, github.head_ref || github.ref_name) }}
 
       # vulnerability scanning to verify PRs
       - name: Docker Scout

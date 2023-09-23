@@ -4,25 +4,29 @@ root = true
 charset = utf-8
 end_of_line = lf
 
+[.editorconfig]
+trim_trailing_whitespace = true
+insert_final_newline = true
+
 [*.md]
 indent_size = 2
 indent_style = space
 trim_trailing_whitespace = false
 insert_final_newline = true
 
-[*.{yml,yaml}]
+[*.y{,a}ml]
 indent_size = 2
 indent_style = space
 insert_final_newline = true
 trim_trailing_whitespace = true
 
-[*.{json,jsonc}]
+[*.json{,c}]
 indent_size = 2
 indent_style = space
 insert_final_newline = true
 trim_trailing_whitespace = true
 
-[{*.,}Dockerfile]
+[{*.,}{D,d}ockerfile]
 indent_size = 4
 indent_style = space
 insert_final_newline = true
@@ -30,6 +34,12 @@ trim_trailing_whitespace = true
 
 [*.sh]
 indent_size =4
+indent_style = space
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+[*.hcl]
+indent_size = 2
 indent_style = space
 insert_final_newline = true
 trim_trailing_whitespace = true

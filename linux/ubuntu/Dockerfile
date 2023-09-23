@@ -253,6 +253,7 @@ RUN pwsh -NonInteractive -Command "Set-PSRepository -Name PSGallery -Installatio
 # install python 3, pip, venv, pipx
 ENV PIPX_BIN_DIR=/opt/pipx_bin \
     PIPX_HOME=/opt/pipx
+ENV PATH=${PIPX_BIN_DIR}:${PATH}
 # kics-scan ignore-block
 RUN apt-get -y update &>/dev/null \
     && apt-get -y install --no-install-recommends \
@@ -262,21 +263,19 @@ RUN apt-get -y update &>/dev/null \
         python3-venv \
     && python3 -m pip install --no-cache-dir \
         pipx \
-    && python3 -m pipx ensurepath \
     && if ! command -v pipx; then echo "pipx was not installed or not found on PATH" && exit 1; fi \
     && sed "s|^PATH=|PATH=${PIPX_BIN_DIR}:|mg" -i /etc/environment \
     && apt-get clean \
     && rm -rf /etc/apt/sources.list.d/* \
     && rm -rf /var/lib/apt/lists/*
-ENV PATH=${PIPX_BIN_DIR}:${PATH}
 
 # Install Go
 ENV PATH=/usr/local/go/bin:${PATH}
 # hadolint ignore=SC2086
-RUN export GOLANG_SHA256_amd64=cc97c28d9c252fbf28f91950d830201aa403836cbed702a05932e63f7f0c7bc4 \
-    GOLANG_SHA256_arm64=15ab379c6a2b0d086fe3e74be4599420e66549edf7426a300ee0f3809500f89e \
-    GOLANG_VERSION=1.20.8 \
-    && curl -fsSL https://golang.org/dl/go"${GOLANG_VERSION}".linux-"${TARGETARCH}".tar.gz -o /tmp/go.tgz \
+ARG GOLANG_SHA256_amd64=cc97c28d9c252fbf28f91950d830201aa403836cbed702a05932e63f7f0c7bc4
+ARG GOLANG_SHA256_arm64=15ab379c6a2b0d086fe3e74be4599420e66549edf7426a300ee0f3809500f89e
+ARG GOLANG_VERSION=1.20.8
+RUN curl -fsSL https://golang.org/dl/go"${GOLANG_VERSION}".linux-"${TARGETARCH}".tar.gz -o /tmp/go.tgz \
     && go_sha="${go_sha=GOLANG_SHA256_${TARGETARCH}}" \
     && echo "${!go_sha} /tmp/go.tgz" | sha256sum -c - \
     && tar -C /usr/local -xzf /tmp/go.tgz \

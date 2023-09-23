@@ -5,7 +5,8 @@
     "**/.jscpd.json",
     "**/.vscode/**",
     "**/tmp/**",
-    "**/megalinter-reports/**"
+    "**/megalinter-reports/**",
+    "**/.editorconfig"
   ],
   "language": "en,en-GB",
   "words": [

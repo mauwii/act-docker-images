@@ -106,6 +106,19 @@ documentation📖][nektosDocs]
   -P ubuntu-20.04=mauwii/ubuntu-act:20.04
   ```
 
+## bake file
+
+I would recommend to execute the ci workflow via act, but if you want to make use of the bake file
+to build the image locally locally, you could do so like this:
+
+```bash
+GITHUB_SHA=$(git rev-parse HEAD) \
+REF_NAME=$(git rev-parse --abbrev-ref HEAD) \
+docker buildx bake --set "*.platform=linux/arm64"
+```
+
+If you are not using a mac silicon, just replace the platform `arm64` with `amd64`.
+
 ## mega-linter
 
 To execute the mega-linter locally without the needs to install it, there are different options:
