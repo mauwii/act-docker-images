@@ -101,7 +101,7 @@ RUN add-apt-repository -y ppa:git-core/ppa \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Git-LFS
-RUN curl -Ls https://packagecloud.io/install/repositories/github/git-lfs/script.deb.sh | bash \
+RUN curl -sSL https://packagecloud.io/install/repositories/github/git-lfs/script.deb.sh | bash \
     && apt-get -y install --no-install-recommends \
         git-lfs \
     && apt-get clean \
@@ -162,7 +162,7 @@ RUN export powershell_version=7.2.13 \
     && export tool_path=/usr/share/powershell \
     && pwsh_nupkg="PowerShell.Linux.$(cat /tmp/targetproc).${powershell_version}.nupkg" \
     && export pwsh_nupkg \
-    && curl -fSLO "https://pwshtool.blob.core.windows.net/tool/${powershell_version}/${pwsh_nupkg}" \
+    && curl -fsSLO "https://pwshtool.blob.core.windows.net/tool/${powershell_version}/${pwsh_nupkg}" \
     && dotnet tool install \
         --add-source / \
         --tool-path "${tool_path}" \
@@ -206,7 +206,7 @@ RUN [[ $(curl -sL https://packages.microsoft.com/repos/azure-cli/dists/) =~ $(ls
     || echo "Azure CLI not available for this distribution"
 
 # install bicep-cli
-RUN curl -Lo bicep https://github.com/Azure/bicep/releases/latest/download/bicep-linux-"$(cat /tmp/targetproc)" \
+RUN curl -sSLo bicep https://github.com/Azure/bicep/releases/latest/download/bicep-linux-"$(cat /tmp/targetproc)" \
     && chmod +x ./bicep \
     && mv ./bicep /usr/local/bin/bicep
 
