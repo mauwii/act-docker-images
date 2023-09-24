@@ -21,7 +21,9 @@ permissions:
 
 env:
   REGISTRY: ${{ vars.DOCKERHUB_USER && 'docker.io' || 'ghcr.io' }}
+  REGISTRY_USER: ${{ vars.DOCKERHUB_USER || github.repository_owner }}
   SHA: ${{ github.event.pull_request.head.sha || github.event.after || github.sha }}
+  BUILDKIT_PROGRESS: plain
 
 jobs:
   test:
@@ -29,14 +31,15 @@ jobs:
     env:
       REGISTRY: ${{ vars.DOCKERHUB_USER && 'docker.io' || 'ghcr.io' }}
     outputs:
-      matrix: ${{ steps.platforms.outputs.matrix }}
+      platforms: ${{ steps.platforms.outputs.matrix }}
+      targets: ${{ steps.targets.outputs.matrix }}
     steps:
       # kics-scan ignore-line
       - uses: actions/checkout@v4
 
-      - name: Set up QEMU
-        # kics-scan ignore-line
-        uses: docker/setup-qemu-action@v3.0.0
+      # kics-scan ignore-line
+      - uses: docker/setup-qemu-action@v3.0.0
+        name: Set up QEMU
 
       - name: Set up Docker Buildx
         # kics-scan ignore-line
@@ -76,47 +79,49 @@ jobs:
           BAKE_TAG="$(docker buildx bake --print | jq -r '[.target[].tags[]][0]')"
           [[ "${BAKE_TAG}" == *"-${{ github.ref_name}}" ]] || exit 1
 
-      - name: Create matrix
+      - name: Create platform matrix
         id: platforms
         run: printf "matrix=%s\n" "$(docker buildx bake linux-platforms --print | jq -cr '.target."linux-platforms".platforms')" >>"${GITHUB_OUTPUT}"
 
-      - name: Show matrix
-        run: |
-          echo ${{ steps.platforms.outputs.matrix }}
+      - name: Show platforms
+        run: echo '${{ steps.platforms.outputs.matrix }}' | jq
+
+      - name: Create target matrix
+        id: targets
+        run: printf "matrix=%s\n" "$(docker buildx bake --print | jq -cr ".group.ubuntu.targets")" >>"${GITHUB_OUTPUT}"
+
+      - name: Show targets
+        run: echo '${{ steps.targets.outputs.matrix }}' | jq
+
   build:
     needs: test
     runs-on: ubuntu-latest
-    # strategy:
-    #   matrix:
-    #     platforms: ${{ fromJson(needs.test.outputs.matrix) }}
-    #     # platforms: ${{ github.event_name == 'pull_request' && fromJson('["linux/amd64", "linux/arm64"]') || fromJson('["linux/amd64,linux/arm64"]') }}
-    env:
-      BUILDKIT_PROGRESS: plain
+    strategy:
+      matrix:
+        platforms: ${{ fromJson(needs.test.outputs.platforms) }}
+        targets: ${{ fromJson(needs.test.outputs.targets) }}
     steps:
       - uses: actions/checkout@v4
 
-      - name: Free up disk space
-        # kics-scan ignore-line
-        uses: ./.github/actions/free-space
-        with:
-          deleteDotnet: 'true'
-          deleteAndroid: 'true'
+      # - name: Free up disk space
+      #   # kics-scan ignore-line
+      #   uses: ./.github/actions/free-space
+      #   with:
+      #     deleteDotnet: 'true'
+      #     deleteAndroid: 'true'
 
-      - name: Set up QEMU
-        # kics-scan ignore-line
-        uses: docker/setup-qemu-action@v3.0.0
+      # kics-scan ignore-line
+      - uses: docker/setup-qemu-action@v3.0.0
+        name: Set up QEMU
 
-      - name: Set up Docker Buildx
-        # kics-scan ignore-line
-        uses: docker/setup-buildx-action@v3.0.0
-        with:
-          # driver: ${{ github.event_name == 'pull_request' && 'docker' || 'docker-container' }}
-          driver: docker-container
-          driver-opts: image=moby/buildkit:v0.12.2
-          install: true
-          use: true
-          cleanup: true
-          # platforms: ${{ matrix.platforms }}
+      # kics-scan ignore-line
+      - uses: docker/setup-buildx-action@v3.0.0
+        name: Set up Docker Buildx
+        # with:
+        #   buildkitd-flags: "--debug"
+        #   # driver: ${{ github.event_name == 'pull_request' && 'docker' || 'docker-container' }}
+        #   # driver: docker-container
+        #   # driver-opts: image=moby/buildkit:v0.12.2
 
       # Login against a container registry
       # https://github.com/docker/login-action
@@ -129,37 +134,59 @@ jobs:
           password: ${{ secrets.DOCKERHUB_TOKEN || secrets.GITHUB_TOKEN }}
           logout: true
 
-      # # Get the architecture to use for the cache tag
-      # - name: get arch
-      #   id: cache-arch
-      #   if: github.event_name == 'pull_request'
-      #   run: >-
-      #     printf "CACHE_ARCH=%s\n" "$(
-      #     docker run
-      #     --quiet
-      #     --platform ${{ matrix.platforms }}
-      #     --rm
-      #     "${PULL_IMAGE}"
-      #     /bin/bash -c "dpkg --print-architecture"
-      #     )" >> "$GITHUB_OUTPUT"
-      #   env:
-      #     PULL_IMAGE: ubuntu:22.04
+      # Get the distro version to use for the cache tag
+      - name: get distro version
+        id: get_version
+        run: |
+          distro_version="${{ matrix.targets }}"
+          echo "distro_version=${distro_version/ubuntu-act-/}" >> "$GITHUB_OUTPUT"
 
+      # Get the architecture to use for the cache tag
+      - name: get arch
+        id: cache-arch
+        run: >-
+          printf "cache_arch=%s\n" "$(
+          docker run
+          --quiet
+          --platform ${{ matrix.platforms }}
+          --rm
+          "${PULL_IMAGE}"
+          /bin/bash -c "dpkg --print-architecture"
+          )" >> "$GITHUB_OUTPUT"
+        env:
+          PULL_IMAGE: ubuntu:${{ steps.get_version.outputs.distro_version }}
+
+      # Bake the image
       # kics-scan ignore-line
       - uses: docker/bake-action@v4.0.0
         name: Build and Push
+        id: bake
         with:
           files: docker-bake.hcl
-          push: ${{ github.event_name != 'pull_request' && github.actor != 'nektos/act' }}
-          sbom: true
+          targets: ${{ matrix.targets }}
           set: |
-            ubuntu*.output=type=${{ env.OUTPUT_TYPE }},${{ env.OUTPUT_KIND }}
-            ${{ github.event_name == 'pull_request' && github.actor != 'nektos/act' && '*.cache-to=type=registry,mode=max' || '' }}
-          #   ubuntu*.platform=${{ matrix.platforms }}
+            *.tags=
+            *.platform=${{ matrix.platforms }}
+            *.cache-from=type=registry,ref=${{ env.REGISTRY_IMAGE }}:cache-${{ steps.get_version.outputs.distro_version }}-${{ steps.cache-arch.outputs.cache_arch }}
+            *.cache-to=type=registry,ref=${{ env.REGISTRY_IMAGE }}:cache-${{ steps.get_version.outputs.distro_version }}-${{ steps.cache-arch.outputs.cache_arch }},mode=max
+            *.output=type=image,"name=${{ env.REGISTRY_IMAGE }}",push-by-digest=true,name-canonical=true,push=${{ github.event_name != 'pull_request' }}
         env:
-          OUTPUT_KIND: ${{ github.event_name != 'pull_request' && 'push=true' || format('dest={0}',  env.FROM_IMAGE_PATH) }}
-          OUTPUT_TYPE: ${{ github.event_name != 'pull_request' && 'registry' || 'docker' }}
-          # REGISTRY_IMAGE: ${{ format('{0}/{1}', env.REGISTRY, env.IMAGE_REPOSITORY) }}
+          REGISTRY_IMAGE: ${{ format('{0}/{1}/ubuntu-act', env.REGISTRY, env.REGISTRY_USER) }}
+          TARGET_PLATFORM_PAIR: ${{ format('{0}-{1}', matrix.targets, steps.cache-arch.outputs.cache_arch) }}
+
+      - name: Export digest
+        run: |
+          mkdir -p /tmp/digests/${{ matrix.targets }}
+          digest="$(echo '${{ steps.bake.outputs.metadata }}' | jq -r '."${{ matrix.targets }}"["containerimage.digest"]')"
+          touch "/tmp/digests/${{ matrix.targets }}/${digest#sha256:}"
+
+      - name: Upload digest
+        uses: actions/upload-artifact@v3
+        with:
+          name: digests
+          path: /tmp/digests/${{ matrix.targets }}/*
+          if-no-files-found: error
+          retention-days: 1
 
       # # vulnerability scanning to verify PRs
       # - name: Docker Scout
@@ -178,6 +205,68 @@ jobs:
       #     summary: ${{ github.actor != 'nektos/act' }}
       #     github-token: ${{ secrets.GITHUB_TOKEN }}
       #     organization: ${{ vars.DOCKERHUB_USER || github.repository_owner }}
+
+  merge:
+    runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request'
+    strategy:
+      matrix:
+        targets: ${{ fromJson(needs.test.outputs.targets) }}
+    needs:
+      - test
+      - build
+    steps:
+      # - name: Download meta bake definition
+      #   uses: actions/download-artifact@v3
+      #   with:
+      #     name: bake-meta
+      #     path: /tmp
+
+      - uses: actions/checkout@v4
+
+      - name: Download digests
+        uses: actions/download-artifact@v3
+        with:
+          name: digests
+          path: /tmp/digests/${{ matrix.targets }}
+
+      - name: Set up Docker Buildx
+        # kics-scan ignore-line
+        uses: docker/setup-buildx-action@v3.0.0
+        # with:
+        #   driver: ${{ github.event_name == 'pull_request' && 'docker' || 'docker-container' }}
+        #   driver: docker-container
+        #   driver-opts: image=moby/buildkit:v0.12.2
+        #   install: true
+        #   use: true
+        #   cleanup: true
+
+      # Login against a container registry
+      # https://github.com/docker/login-action
+      # kics-scan ignore-line
+      - uses: docker/login-action@v3.0.0
+        name: Login to ${{ env.REGISTRY }}
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ vars.DOCKERHUB_USER || github.repository_owner }}
+          password: ${{ secrets.DOCKERHUB_TOKEN || secrets.GITHUB_TOKEN }}
+          logout: true
+
+      - name: bake metadata
+        id: bake-meta
+        run: docker buildx bake ${{ matrix.targets }} --print > /tmp/${{ matrix.targets }}.json
+
+      - name: Create manifest list and push
+        working-directory: /tmp/digests/${{ matrix.targets }}
+        run: |
+          docker buildx imagetools create \
+            $(jq -cr '.target[].tags | map(select(startswith("${{ env.REGISTRY}}")) | "-t " + .) | join(" ")' </tmp/${{ matrix.targets }}.json) \
+            $(printf '${{ env.REGISTRY_IMAGE }}@sha256:%s ' *)
+        env:
+          REGISTRY_IMAGE: ${{ format('{0}/{1}/ubuntu-act', env.REGISTRY, env.REGISTRY_USER) }}
+
+      - name: Inspect image
+        run: docker buildx imagetools inspect "$(jq -r '.target."${{ matrix.targets }}".tags[0]' < /tmp/${{ matrix.targets }}.json)"
 
   approve-pr:
     name: Approve PR
