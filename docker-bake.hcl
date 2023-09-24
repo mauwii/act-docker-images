@@ -80,8 +80,6 @@ target "ubuntu" {
   }
   name = "ubuntu-act-${release.codename}"
   cache-from = [
-    "${REGISTRY}/${REPOSITORY_OWNER}/ubuntu-act:cache-${release.codename}-amd64",
-    "${REGISTRY}/${REPOSITORY_OWNER}/ubuntu-act:cache-${release.codename}-arm64",
     "${REGISTRY}/${REPOSITORY_OWNER}/ubuntu-act:cache-${release.codename}"
   ]
   cache-to = [
