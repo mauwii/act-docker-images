@@ -63,7 +63,7 @@ jobs:
       - name: validate tag
         run: |
           BAKE_TAG="$(docker buildx bake --print | jq -r '[.target[].tags[]][0]')"
-          [[ "${BAKE_TAG}" == *"-${{ github.ref_name}}" ]] || exit 1
+          [[ "${BAKE_TAG}" == *"-${{ github.base_ref || github.ref_name}}" ]] || exit 1
 
       - name: Create matrix
         id: matrix
