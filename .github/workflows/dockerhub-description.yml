@@ -17,14 +17,16 @@ jobs:
   dockerHubDescription:
     name: Update Docker-Hub description
     runs-on: ubuntu-latest
+    # Ensure this job only runs if the Docker-Hub user is set
+    if: vars.DOCKERHUB_USERNAME != ''
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4.0.0
 
       - name: Docker Hub Description
         uses: peter-evans/dockerhub-description@dc67fad7001ef9e8e3c124cb7a64e16d0a63d864
         with:
-          username: ${{ github.repository_owner }}
+          username: ${{ vars.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
-          repository: ${{ github.repository_owner }}/ubuntu-act
+          repository: ${{ format('{0}/{1}', vars.DOCKERHUB_USER, 'ubuntu-act') }}
           short-description: ${{ github.event.repository.description }}
-          enable-url-completion: true
