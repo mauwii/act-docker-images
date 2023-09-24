@@ -28,5 +28,5 @@ jobs:
         with:
           username: ${{ vars.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
-          repository: ${{ format('{0}/{1}', vars.DOCKERHUB_USER, 'ubuntu-act') }}
+          repository: ${{ format('{0}/{1}', vars.DOCKERHUB_USERNAME, 'ubuntu-act') }}
           short-description: ${{ github.event.repository.description }}
