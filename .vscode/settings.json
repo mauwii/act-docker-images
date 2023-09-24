@@ -4,6 +4,10 @@
       "strings": true
     }
   },
+  "[ignore]": {
+    "editor.defaultFormatter": "foxundermoon.shell-format",
+    "files.insertFinalNewline": true
+  },
   "[markdown]": {
     "diffEditor.ignoreTrimWhitespace": false,
     "editor.defaultFormatter": "esbenp.prettier-vscode",

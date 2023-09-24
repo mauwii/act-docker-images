@@ -1,1 +1,1 @@
-DOCKERHUB_USER=<your_docker_hub_user>
+DOCKERHUB_USERNAME=<your_docker_hub_user>

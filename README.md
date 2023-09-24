@@ -12,21 +12,21 @@
 [![MegaLinter](https://github.com/mauwii/act-docker-images/workflows/MegaLinter/badge.svg?branch=main&event=push)][workflowMegaLinter]
 [![Docker-Hub description](https://github.com/mauwii/act-docker-images/actions/workflows/dockerhub-description.yml/badge.svg?branch=main)][workflowDhDesc]
 
-## ⚠️ Heavily under construction... ⚠️
-
-...so please do not use this anywhere in production ❗
+> [!WARNING]  
+> Heavily under construction, so please do not use this anywhere in production
 
 ## What
 
-The docker images in this repository can be used with [nektos/act][nektosActRepo], which is a very
-handy tool to run your github workflows locally.
+The docker images in this repository are made to be used with [nektos/act][nektosActRepo], which is
+a very handy tool to execute github workflows locally.
 
 If you don't know it yet, I highly recommend to check it out 🤓
 
 ## Why
 
 In the other Images I had problems with executing azure related tools, so I decided to create my own
-image which is heavily inspired by the images of [catthehacker][catthehackerImages]
+image which is heavily inspired by the images of [catthehacker][catthehackerImages] and the
+[official runner images][actionsRunnerImages].
 
 ## How to use
 
@@ -41,7 +41,7 @@ The easiest way is to add those lines in your `~/.actrc`:
 -P ubuntu-20.04=mauwii/ubuntu-act:20.04
 ```
 
-For further Informations about nektos/arc and how to use it, take a 👀 at the [nektos
+For further Informations about nektos/act and how to use it, take a 👀 at the [nektos
 documentation📖][nektosDocs]
 
 ## How I run act on my M2-Max 💻
@@ -52,19 +52,21 @@ documentation📖][nektosDocs]
   brew install act
   ```
 
+  > [!IMPORTANT]  
+  > Use `act --version` to make sure you have at least `act version 0.2.51`, which came with support
+  > for node20
+
 - set an alias to always pass the GITHUB_TOKEN (requires github-cli (`brew install gh`))
 
   ```bash
-  # always add gh auth token to act
-  if validate_command act; then
+  if command -v act >/dev/null 2>&1; then
       alias act='act -s GITHUB_TOKEN="$(gh auth token)"'
-  # add alias to use gh act as act if gh-act is installed and act is not found
   elif gh extension list | grep -q "nektos/gh-act"; then
       alias act='gh act -s GITHUB_TOKEN="$(gh auth token)"'
   fi
   ```
 
-- Docker-Desktop settings:
+- 🐳 Docker-Desktop settings:
 
   - Docker Engine (`~/.docker/daemon.json`):
 
@@ -85,37 +87,54 @@ documentation📖][nektosDocs]
 
   - Features in Development:
 
-    - [ ] containerd
-    - [ ] wasm
-    - [x] rosetta
-    - [x] builds view
+    - ❌ containerd
+    - ❌ wasm
+    - ✅ rosetta
+    - ✅ builds view
 
   - Advanced:
-    - [ ] system
-    - [x] user
-    - [x] Allow the default Docker socket to be used
-    - [ ] Allow privileged port mapping
-    - [x] Automatically check configuration
+    - ❌ system
+    - ✅ user
+    - ✅ Allow the default Docker socket to be used
+    - ❌ Allow privileged port mapping
+    - ✅ Automatically check configuration
 
 - `~/.actrc`:
 
-  ```text
+  ```bash
   --rm
   -P ubuntu-latest=mauwii/ubuntu-act:latest
   -P ubuntu-22.04=mauwii/ubuntu-act:22.04
   -P ubuntu-20.04=mauwii/ubuntu-act:20.04
   ```
 
-## bake file
+## docker-bake file
 
-I would recommend to execute the ci workflow via act, but if you want to make use of the bake file
-to build the image locally locally, you could do so like this:
+As always, there are different options to build the images locally. I added `docker-bake.hcl` which
+helps with orchestrating builds and needs buildx to be available, which comes out of the box with
+docker desktop. Bake Files are still considered experimental, and your results may be totally
+different depending on your local docker configuration.
 
-```bash
-GITHUB_SHA=$(git rev-parse HEAD) \
-REF_NAME=$(git rev-parse --abbrev-ref HEAD) \
-docker buildx bake --set "*.platform=linux/arm64"
-```
+- using the `local` tag:
+
+  ```bash
+  docker buildx bake \
+      --set "*.platform=linux/$(uname -m)"
+  ```
+
+- using the current branch as a tag name and set better labels, without pushing the cache to the
+  registry:
+
+  ```bash
+  GITHUB_SHA="$(git rev-parse HEAD)" \
+  REF_NAME="$(git rev-parse --abbrev-ref HEAD)" \
+  docker buildx bake \
+      --set="*.cache-to=" \
+      --set="*.platform=linux/$(uname -m)"
+  ```
+
+  When you do this from the main branch and already use the latest image, it will be replaced with
+  the one you just built.
 
 If you are not using a mac silicon, just replace the platform `arm64` with `amd64`.
 
@@ -125,22 +144,24 @@ To execute the mega-linter locally without the needs to install it, there are di
 
 - you can use act (I assume you run act the way I just explained):
 
-  This has the advantage that you run act with the same settings as the workflow itself would do.
-
   ```bash
   act -W .github/workflows/mega-linter.yml
   ```
+
+  This has the advantage that megalinter executes with the same settings as the workflow itself
+  would do, while not providing fixed versions if errors where found
 
 - or you could use npx:
 
   ```bash
   npx mega-linter-runner \
-      --flavor security \
+      --flavor terraform \
       -e GITHUB_TOKEN="$(gh auth token)" \
       --remove-container
   ```
 
-  The flavor is optional, the GH Action is currently not using a flavor
+  The flavor is optional but can be pretty useful if you have low bandwidth or limited storage,
+  while the GH Action is currently using the full megalinter image.
 
 ## Pre-Commit-Hook
 
@@ -151,12 +172,14 @@ would be via pipx.
 After successfully installing pre-commit on your system, you need to run `pre-commit install` in the
 repository root if you want to enable the pre-commit hooks on your system as well.
 
-[dockerHub]: https://hub.docker.com/r/mauwii/ubuntu-act/ "DockerHub"
+[dockerHub]: https://hub.docker.com/r/mauwii/ubuntu-act/ "DockerHub container repository"
 [githubRepo]: https://github.com/mauwii/act-docker-images/ "GitHub repository"
-[githubFork]: https://github.com/mauwii/act-docker-images/fork/ "GitHub forks"
-[githubIssues]: https://github.com/mauwii/act-docker-images/issues/ "GitHub issues"
-[githubCommits]: https://github.com/mauwii/act-docker-images/commits/ "GitHub commits"
-[workflowCi]: https://github.com/mauwii/act-docker-images/actions/workflows/ci.yml "ci workflow"
+[githubFork]: https://github.com/mauwii/act-docker-images/fork/ "GitHub repository - forks"
+[githubIssues]: https://github.com/mauwii/act-docker-images/issues/ "GitHub repository - issues"
+[githubCommits]: https://github.com/mauwii/act-docker-images/commits/ "GitHub repository - commits"
+[workflowCi]:
+  https://github.com/mauwii/act-docker-images/actions/workflows/ci.yml
+  "GitHub workflow - ci"
 [workflowDhDesc]:
   https://github.com/mauwii/act-docker-images/actions/workflows/dockerhub-description.yml
   "DockerHub Description Workflow"
@@ -164,7 +187,8 @@ repository root if you want to enable the pre-commit hooks on your system as wel
   https://github.com/mauwii/act-docker-images/actions?query=workflow%3AMegaLinter+branch%3Amain
   "MegaLinter Workflow"
 [nektosActRepo]: https://github.com/nektos/act "nektos/act git repository"
+[nektosDocs]: https://nektosact.com/beginner/index.html "nektos/act docs"
 [catthehackerImages]:
   https://github.com/catthehacker/docker_images
   "catthehacker/docker_images repo"
-[nektosDocs]: https://nektosact.com/beginner/index.html "nektos/act docs"
+[actionsRunnerImages]: https://github.com/actions/runner-images "official GitHub Runner images"
