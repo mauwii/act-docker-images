@@ -81,7 +81,11 @@ target "ubuntu" {
   name = "ubuntu-act-${release.codename}"
   cache-from = [
     "${REGISTRY}/${REPOSITORY_OWNER}/ubuntu-act:cache-${release.codename}-amd64",
-    "${REGISTRY}/${REPOSITORY_OWNER}/ubuntu-act:cache-${release.codename}-arm64"
+    "${REGISTRY}/${REPOSITORY_OWNER}/ubuntu-act:cache-${release.codename}-arm64",
+    "${REGISTRY}/${REPOSITORY_OWNER}/ubuntu-act:cache-${release.codename}"
+  ]
+  cache-to = [
+    notequal(REF_NAME, "local") ? "${REGISTRY}/${REPOSITORY_OWNER}/ubuntu-act:cache-${release.codename}" : ""
   ]
   tags = [
     "${REGISTRY}/${REPOSITORY_OWNER}/ubuntu-act:${release.major}.${release.minor}-${and(notequal(REF_NAME, ""),notequal(REF_NAME, null))?REF_NAME:"local"}",
