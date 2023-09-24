@@ -1,14 +1,15 @@
+---
 # yaml-language-server: $schema=https://json.schemastore.org/github-workflow.json
 
 name: ci
 
 on:
   push:
-    branches: [main]
     paths:
       - '**/Dockerfile'
       - '**/toolsets/*.json'
       - '**/.github/workflows/ci.yml'
+      - '**/docker-bake.hcl'
   pull_request:
     branches: [main]
   workflow_dispatch:
@@ -18,203 +19,137 @@ permissions:
   packages: write
   pull-requests: write
 
+env:
+  REGISTRY: ${{ vars.DOCKERHUB_USER && 'docker.io' || 'ghcr.io' }}
+  REGISTRY_USER: ${{ vars.DOCKERHUB_USER || github.repository_owner }}
+  GITHUB_SHA: ${{ github.event.pull_request.head.sha || github.event.after || github.sha }}
+  BUILDKIT_PROGRESS: plain
+
 jobs:
+  test:
+    runs-on: ubuntu-latest
+    env:
+      REGISTRY: ${{ vars.DOCKERHUB_USER && 'docker.io' || 'ghcr.io' }}
+    outputs:
+      targets: ${{ steps.matrix.outputs.targets }}
+    steps:
+      # kics-scan ignore-line
+      - uses: actions/checkout@v4
+
+      # kics-scan ignore-line
+      - uses: docker/setup-qemu-action@v3.0.0
+        name: Set up QEMU
+
+      - name: Set up Docker Buildx
+        # kics-scan ignore-line
+        uses: docker/setup-buildx-action@v3.0.0
+
+      - name: get docker binary path
+        id: docker-binary-path
+        run: echo "DOCKER_BINARY_PATH=$(which docker)" >> "$GITHUB_OUTPUT"
+
+      - name: print bake file with empty env
+        id: bake-file-no-env
+        run: env -i ${{ steps.docker-binary-path.outputs.DOCKER_BINARY_PATH }} buildx bake --print
+
+      - name: verify tag ends on -local
+        run: |
+          BAKE_TAG="$(env -i ${{ steps.docker-binary-path.outputs.DOCKER_BINARY_PATH }} buildx bake --print  | jq -r '[.target[].tags[]][0]')"
+          [[ "${BAKE_TAG}" == *"-local" ]] || exit 1
+
+      - name: print bake file
+        run: docker buildx bake --print
+
+      - name: validate tag
+        run: |
+          BAKE_TAG="$(docker buildx bake --print | jq -r '[.target[].tags[]][0]')"
+          [[ "${BAKE_TAG}" == *"-${{ github.base_ref || github.ref_name}}" ]] || exit 1
+
+      - name: Create matrix
+        id: matrix
+        run: printf "targets=%s\n" "$(docker buildx bake --print | jq -r '"\(.target | keys)"')" >>"${GITHUB_OUTPUT}"
+
+      - name: Show matrix
+        run: echo '${{ steps.matrix.outputs.targets }}' | jq
+
   build:
+    needs: test
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        platforms: ${{ github.event_name == 'pull_request' && fromJson('["linux/amd64", "linux/arm64"]') || fromJson('["linux/amd64,linux/arm64"]') }}
-        from-version: ['22.04', '20.04']
-        include:
-          - from-version: '22.04'
-            from-version-major: '22'
-            from-version-minor: '04'
-            distro: 'ubuntu'
-            codename: 'jammy'
-            from-flavor: 'act'
-          - from-version: '20.04'
-            from-version-major: '20'
-            from-version-minor: '04'
-            distro: 'ubuntu'
-            codename: 'focal'
-            from-flavor: 'act'
-    env:
-      BUILDKIT_PROGRESS: plain
-      FROM_IMAGE_PATH: /tmp/${{ matrix.distro }}-${{ matrix.from-version }}.tar
-      IMAGE_NAME: ${{ format('{0}-{1}', matrix.distro, matrix.from-flavor) }}
-      IMAGE_REPOSITORY: ${{ format('{0}/{1}-{2}', vars.DOCKERHUB_USER || github.repository_owner, matrix.distro, matrix.from-flavor) }}
-      REGISTRY: ${{ vars.DOCKERHUB_USER && 'docker.io' || 'ghcr.io' }}
-      SHA: ${{ github.event.pull_request.head.sha || github.event.after || github.sha }}
-      TO_TAG: ${{ format('{0}/{1}/{2}-{3}:{4}', 'docker.io', vars.DOCKERHUB_USER, matrix.distro, matrix.from-flavor, matrix.from-version) }}
+        targets: ${{ fromJson(needs.test.outputs.targets) }}
     steps:
       - uses: actions/checkout@v4
 
       - name: Free up disk space
+        # kics-scan ignore-line
         uses: ./.github/actions/free-space
         with:
           deleteDotnet: 'true'
           deleteAndroid: 'true'
 
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3.0.0
+      # kics-scan ignore-line
+      - uses: docker/setup-qemu-action@v3.0.0
+        name: Set up QEMU
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3.0.0
+      # kics-scan ignore-line
+      - uses: docker/setup-buildx-action@v3.0.0
+        name: Set up Docker Buildx
         with:
           driver: docker-container
-          driver-opts: image=moby/buildkit:v0.12.2,network=host
-          install: true
-          use: true
-          cleanup: true
-          platforms: ${{ matrix.platforms }}
+          driver-opts: image=moby/buildkit:v0.12.2
+          # driver: ${{ github.event_name == 'pull_request' && 'docker' || 'docker-container' }}
 
-      # Login against a Docker registry
+      # Login against a container registry
       # https://github.com/docker/login-action
-      - name: Login to ${{ env.REGISTRY }}
-        uses: docker/login-action@v3.0.0
+      # kics-scan ignore-line
+      - uses: docker/login-action@v3.0.0
+        name: Login to ${{ env.REGISTRY }}
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ vars.DOCKERHUB_USER || github.repository_owner }}
           password: ${{ secrets.DOCKERHUB_TOKEN || secrets.GITHUB_TOKEN }}
           logout: true
 
-      # Extract metadata (tags, labels) for Docker
-      # https://github.com/docker/metadata-action
-      - name: Extract Docker metadata
-        id: meta
-        uses: docker/metadata-action@v5.0.0
+      # Bake the image
+      # kics-scan ignore-line
+      - uses: docker/bake-action@v4.0.0
+        name: Build and Push
+        id: bake
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          images: ${{ github.actor == 'nektos/act' && env.IMAGE_REPOSITORY || env.REGISTRY_IMAGE }}
-          tags: |
-            type=sha,prefix=${{ matrix.from-version }}-,format=short,enable=${{ github.ref == 'refs/heads/main' }},priority=1000
-            type=raw,value=${{ matrix.from-version }},enable=${{ github.ref == 'refs/heads/main' }},priority=900
-            type=raw,value=${{ matrix.from-version }}-${{ github.head_ref || github.ref_name }},priority=600
-          flavor: |
-            latest=${{ github.ref == 'refs/heads/main' && matrix.from-version == '22.04' }}
-          labels: |
-            org.opencontainers.image.authors='${{ env.REPOSITORY_LINK }},${{ github.actor }}'
-            org.opencontainers.image.description=${{ github.event.repository.description }}
-            org.opencontainers.image.documentation=${{ env.REPOSITORY_LINK }}
-            org.opencontainers.image.revision=${{ env.SHA }}
-            org.opencontainers.image.source=${{ github.repositoryUrl }}
-            org.opencontainers.image.title=${{ env.IMAGE_REPOSITORY }}:${{ matrix.from-version }}-${{ github.head_ref || github.ref_name }}
-            org.opencontainers.image.url=${{ env.REPOSITORY_LINK }}/blob/${{ env.SHA }}/linux/${{ matrix.distro }}/Dockerfile
-            org.opencontainers.image.vendor=${{ github.repository_owner }}
-        env:
-          REGISTRY_IMAGE: ${{ format('{0}/{1}', env.REGISTRY, env.IMAGE_REPOSITORY) }}
-          REPOSITORY_LINK: https://github.com/${{ github.repository }}
+          files: docker-bake.hcl
+          targets: ${{ matrix.targets }}
+          sbom: true
+          provenance: true
+          push: ${{ github.event_name != 'pull_request' }}
 
-      # # Build and push Docker image with Buildx (don't push on PR)
-      # # https://github.com/docker/build-push-action
-      # - name: Build and push
-      #   id: build
-      #   uses: docker/build-push-action@v4
+      # # vulnerability scanning to verify PRs
+      # - name: Docker Scout
+      #   id: docker-scout
+      #   uses: docker/scout-action@v0.23.4
+      #   if: github.event_name == 'pull_request'
       #   with:
-      #     context: .
-      #     # github-token for the repository context
+      #     platform: ${{ matrix.platforms }}
+      #     command: quickview
+      #     image: ${{ env.FROM_IMAGE_PATH }}
+      #     type: archive
+      #     to: ${{ env.TO_TAG }}
+      #     ignore-unchanged: true
+      #     only-severities: critical
+      #     write-comment: ${{ github.actor != 'nektos/act' }}
+      #     summary: ${{ github.actor != 'nektos/act' }}
       #     github-token: ${{ secrets.GITHUB_TOKEN }}
-      #     file: ./linux/${{ matrix.distro }}/Dockerfile
-      #     platforms: ${{ matrix.platforms }}
-      #     labels: ${{ steps.meta.outputs.labels }}
-      #     tags: ${{ steps.meta.outputs.tags }}
-      #     # tags: ${{ format('{0}:{1}-{2}', github.actor != 'nektos/act' && env.REGISTRY_IMAGE || env.IMAGE_REPOSITORY, matrix.from-version, github.head_ref || github.ref_name) }}
-      #     build-args: |
-      #       FROM_IMAGE=buildpack-deps
-      #       FROM_VERSION_MAJOR=${{ matrix.from-version-major }}
-      #       FROM_VERSION_MINOR=${{ matrix.from-version-minor }}
-      #       FROM_FLAVOR=${{ matrix.from-flavor }}
-      #       DISTRO=${{ matrix.distro }}
-      #       CODENAME=${{ matrix.codename }}
-      #     # caching to speed up the build
-      #     cache-from: |
-      #       ${{ format('type=registry,ref={0}:{1}', env.REGISTRY_IMAGE, matrix.from-version) }}
-      #       ${{ format('type=registry,ref={0}:cache-{1}', env.REGISTRY_IMAGE, matrix.codename) }}
-      #     # don't export cache on PR
-      #     cache-to: ${{ github.ref == 'refs/heads/main' && format('type=registry,ref={0}:cache-{1},mode=max', env.REGISTRY_IMAGE, matrix.codename) || '' }}
-      #     # this will give us some useful information about the build
-      #     push: ${{ github.ref == 'refs/heads/main' }}
-      #     provenance: mode=max
-      #     # push if not building with act
-      #     outputs: 'type=oci,dest=${{ env.FROM_IMAGE_PATH }}'
-      #   env:
-      #     REGISTRY_IMAGE: ${{ format('{0}/{1}', env.REGISTRY, env.IMAGE_REPOSITORY) }}
-
-      # Get the architecture to use for the cache tag
-      - name: get arch
-        id: cache-arch
-        if: github.event_name == 'pull_request'
-        run: >-
-          printf "CACHE_ARCH=%s\n" "$(
-          docker run
-          --quiet
-          --platform ${{ matrix.platforms }}
-          --rm
-          "${PULL_IMAGE}"
-          /bin/bash -c "dpkg --print-architecture"
-          )" >> "$GITHUB_OUTPUT"
-        env:
-          PULL_IMAGE: ${{ format('{0}:{1}', matrix.distro, matrix.codename) }}
-
-      # Build and push Docker images
-      - name: build image
-        run: >-
-          while IFS='' read -r line; do tags+=(-t "${line}"); done < <(echo "${DOCKER_METADATA_OUTPUT_JSON}" | jq -r '.tags[]')
-          && docker build "${tags[@]}"
-          --file linux/${{ matrix.distro }}/Dockerfile
-          --platform ${{ matrix.platforms }}
-          --cache-from ${{ format('type=registry,ref={0}:{1}', env.REGISTRY_IMAGE, matrix.from-version) }}
-          --cache-from ${{ format('type=registry,ref={0}:cache-{1}-{2}', env.REGISTRY_IMAGE, matrix.codename, 'amd64') }}
-          --cache-from ${{ format('type=registry,ref={0}:cache-{1}-{2}', env.REGISTRY_IMAGE, matrix.codename, 'arm64') }}
-          --ulimit=nofile=4096:4096
-          ${{ github.event_name == 'pull_request' && github.actor != 'nektos/act' && format('--cache-to type=registry,ref={0}:cache-{1}-{2},mode=max', env.REGISTRY_IMAGE, matrix.codename, steps.cache-arch.outputs.CACHE_ARCH) || '' }}
-          --build-arg FROM_IMAGE='buildpack-deps'
-          --build-arg FROM_VERSION_MAJOR='${{ matrix.from-version-major }}'
-          --build-arg FROM_VERSION_MINOR='${{ matrix.from-version-minor }}'
-          --build-arg CODENAME='${{ matrix.codename }}'
-          --build-arg FROM_FLAVOR='${{ matrix.from-flavor }}'
-          --build-arg DISTRO='${{ matrix.distro }}'
-          --output=type=${{ env.OUTPUT_TYPE }},${{ env.OUTPUT_KIND }}
-          --label org.opencontainers.image.authors='${{ env.TAG_AUTHORS }}'
-          --label org.opencontainers.image.description='${{ github.event.repository.description }}'
-          --label org.opencontainers.image.documentation='${{ env.REPOSITORY_LINK }}'
-          --label org.opencontainers.image.revision='${{ env.SHA }}'
-          --label org.opencontainers.image.source='${{ github.repositoryUrl }}'
-          --label org.opencontainers.image.title='${{ env.TITLE_TAG }}'
-          --label org.opencontainers.image.url='${{ env.REPOSITORY_LINK }}/blob/${{ env.SHA }}/linux/${{ matrix.distro }}/Dockerfile'
-          --label org.opencontainers.image.vendor='${{ github.repository_owner }}'
-          .
-        env:
-          OUTPUT_KIND: ${{ github.ref == 'refs/heads/main' && 'push=true' || format('dest={0}',  env.FROM_IMAGE_PATH) }}
-          OUTPUT_TYPE: ${{ github.ref == 'refs/heads/main' && 'registry' || 'docker' }}
-          REGISTRY_IMAGE: ${{ format('{0}/{1}', env.REGISTRY, env.IMAGE_REPOSITORY) }}
-          REPOSITORY_LINK: https://github.com/${{ github.repository }}
-          TAG_AUTHORS: ${{ format('{0},{1}', env.REPOSITORY_LINK, github.triggering_actor) }}
-          TITLE_TAG: ${{ format('{0}:{1}', env.IMAGE_REPOSITORY, github.head_ref || github.ref_name) }}
-
-      # vulnerability scanning to verify PRs
-      - name: Docker Scout
-        id: docker-scout
-        uses: docker/scout-action@v0.23.4
-        if: github.event_name == 'pull_request'
-        with:
-          platform: ${{ matrix.platforms }}
-          command: quickview
-          image: ${{ env.FROM_IMAGE_PATH }}
-          type: archive
-          to: ${{ env.TO_TAG }}
-          ignore-unchanged: true
-          only-severities: critical
-          write-comment: ${{ github.actor != 'nektos/act' }}
-          summary: ${{ github.actor != 'nektos/act' }}
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          organization: ${{ vars.DOCKERHUB_USER || github.repository_owner }}
+      #     organization: ${{ vars.DOCKERHUB_USER || github.repository_owner }}
 
   approve-pr:
     name: Approve PR
     runs-on: ubuntu-latest
     needs: [build]
-    if: github.actor != 'nektos/act' && contains(fromJson('["mauwii","dependabot[bot]"]'), github.triggering_actor) && github.event_name == 'pull_request' &&  needs.build.result == 'success'
+    if: >-
+      ${{ github.actor != 'nektos/act' &&
+      contains(fromJson('["mauwii","dependabot[bot]"]'), github.triggering_actor) &&
+      github.event_name == 'pull_request' &&
+      needs.build.result == 'success' }}
     permissions:
       contents: read
       pull-requests: write

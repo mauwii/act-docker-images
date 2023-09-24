@@ -1,8 +1,7 @@
----
-# yaml-language-server: $schema=https://json.schemastore.org/github-workflow.json
-
 # MegaLinter GitHub Action configuration file
 # More info at https://megalinter.io
+---
+# yaml-language-server: $schema=https://json.schemastore.org/github-workflow.json
 name: MegaLinter
 
 on:
@@ -29,15 +28,16 @@ permissions:
   pull-requests: write
 
 jobs:
-  build:
+  megalinter:
     name: MegaLinter
     runs-on: ubuntu-latest
     env:
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
       # Git Checkout
-      - name: Checkout Code
-        uses: actions/checkout@v4
+      # kics-scan ignore-line
+      - uses: actions/checkout@v4.0.0
+        name: Checkout Code
         with:
           set-safe-directory: true
           # token: ${{ secrets.PAT || secrets.GITHUB_TOKEN }}
@@ -45,22 +45,25 @@ jobs:
           fetch-depth: 0 # If you use VALIDATE_ALL_CODEBASE = true, you can remove this line to improve performances
 
       # MegaLinter
-      - name: MegaLinter
+      # You can override MegaLinter flavor used to have faster performances
+      # More info at https://megalinter.io/latest/flavors
+      # kics-scan ignore-line
+      - uses: oxsecurity/megalinter@v7.4.0
+        name: MegaLinter
         id: ml
-        # You can override MegaLinter flavor used to have faster performances
-        # More info at https://megalinter.io/flavors/
-        uses: oxsecurity/megalinter@v7
         env:
           # All available variables are described in documentation
-          # https://megalinter.io/configuration/
-          VALIDATE_ALL_CODEBASE: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }} # Validates all source when push on main, else just the git diff with main. Set 'true' if you always want to lint all sources
+          # https://megalinter.io/latest/config-file/
+          # Validates all source when push on main or run in act, else just the git diff with main. Set 'true' if you always want to lint all sources
+          VALIDATE_ALL_CODEBASE: ${{ (github.event_name == 'push' && github.ref == 'refs/heads/main') || github.actor == 'nektos/act' }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # ADD YOUR CUSTOM ENV VARIABLES HERE TO OVERRIDE VALUES OF .mega-linter.yml AT THE ROOT OF YOUR REPOSITORY
 
       # Upload MegaLinter artifacts
-      - name: Archive production artifacts
+      # kics-scan ignore-line
+      - uses: actions/upload-artifact@v3.1.3
+        name: Archive production artifacts
         if: github.actor != 'nektos/act' && (success() || failure())
-        uses: actions/upload-artifact@v3
         with:
           name: MegaLinter reports
           path: |
@@ -68,29 +71,80 @@ jobs:
             mega-linter.log
 
       # Create pull request if applicable (for now works only on PR from same repository, not from forks)
-      - name: Create Pull Request with applied fixes
+      - uses: peter-evans/create-pull-request@153407881ec5c347639a548ade7d8ad1d6740e38
+        name: Create Pull Request with applied fixes
         id: cpr
-        if: github.actor != 'nektos/act' && steps.ml.outputs.has_updated_sources == 1 && (env.APPLY_FIXES_EVENT == 'all' || env.APPLY_FIXES_EVENT == github.event_name) && env.APPLY_FIXES_MODE == 'pull_request' && (github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository) && !contains(github.event.head_commit.message, 'skip fix')
-        uses: peter-evans/create-pull-request@v5
+        if: >-
+          github.actor != 'nektos/act' &&
+          steps.ml.outputs.has_updated_sources == 1 &&
+          (
+            env.APPLY_FIXES_EVENT == 'all' ||
+            env.APPLY_FIXES_EVENT == github.event_name
+          ) &&
+          env.APPLY_FIXES_MODE == 'pull_request' &&
+          (
+            github.event_name == 'push' ||
+            github.event.pull_request.head.repo.full_name == github.repository
+          )
         with:
-          # token: ${{ secrets.PAT || secrets.GITHUB_TOKEN }}
           token: ${{ secrets.GITHUB_TOKEN }}
           commit-message: '[MegaLinter] Apply linters automatic fixes'
           title: '[MegaLinter] Apply linters automatic fixes'
           labels: bot
+
       - name: Create PR output
-        if: github.actor != 'nektos/act' && steps.ml.outputs.has_updated_sources == 1 && (env.APPLY_FIXES_EVENT == 'all' || env.APPLY_FIXES_EVENT == github.event_name) && env.APPLY_FIXES_MODE == 'pull_request' && (github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository) && !contains(github.event.head_commit.message, 'skip fix')
+        if: >-
+          github.actor != 'nektos/act' &&
+          steps.ml.outputs.has_updated_sources == 1 &&
+          (
+            env.APPLY_FIXES_EVENT == 'all' ||
+            env.APPLY_FIXES_EVENT == github.event_name
+          ) &&
+          env.APPLY_FIXES_MODE == 'pull_request' &&
+          (
+            github.event_name == 'push' ||
+            github.event.pull_request.head.repo.full_name == github.repository
+          )
         run: |
-          echo "Pull Request Number - ${{ steps.cpr.outputs.pull-request-number }}"
-          echo "Pull Request URL - ${{ steps.cpr.outputs.pull-request-url }}"
+          printf "Pull Request Number - %s\n" "${PR_NUMBER}"
+          printf "Pull Request URL - %s\n" "${PR_URL}"
+        env:
+          PR_NUMBER: '${{ steps.cpr.outputs.pull-request-number }}'
+          PR_URL: '${{ steps.cpr.outputs.pull-request-url }}'
 
       # Push new commit if applicable (for now works only on PR from same repository, not from forks)
       - name: Prepare commit
-        if: github.actor != 'nektos/act' && steps.ml.outputs.has_updated_sources == 1 && (env.APPLY_FIXES_EVENT == 'all' || env.APPLY_FIXES_EVENT == github.event_name) && env.APPLY_FIXES_MODE == 'commit' && github.ref != 'refs/heads/main' && (github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository) && !contains(github.event.head_commit.message, 'skip fix')
-        run: sudo chown -Rc $UID .git/
-      - name: Commit and push applied linter fixes
-        if: github.actor != 'nektos/act' && steps.ml.outputs.has_updated_sources == 1 && (env.APPLY_FIXES_EVENT == 'all' || env.APPLY_FIXES_EVENT == github.event_name) && env.APPLY_FIXES_MODE == 'commit' && github.ref != 'refs/heads/main' && (github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository) && !contains(github.event.head_commit.message, 'skip fix')
-        uses: stefanzweifel/git-auto-commit-action@v4
+        if: >-
+          github.actor != 'nektos/act' &&
+          steps.ml.outputs.has_updated_sources == 1 &&
+          (
+            env.APPLY_FIXES_EVENT == 'all' ||
+            env.APPLY_FIXES_EVENT == github.event_name
+          ) &&
+          env.APPLY_FIXES_MODE == 'commit' &&
+          github.ref != 'refs/heads/main' &&
+          (
+            github.event_name == 'push' ||
+            github.event.pull_request.head.repo.full_name == github.repository
+          )
+        run: sudo chown -Rc "${UID}" .git/
+
+      # kics-scan ignore-line
+      - uses: stefanzweifel/git-auto-commit-action@v4
+        name: Commit and push applied linter fixes
+        if: >-
+          github.actor != 'nektos/act' &&
+          steps.ml.outputs.has_updated_sources == 1 &&
+          (
+            env.APPLY_FIXES_EVENT == 'all' ||
+            env.APPLY_FIXES_EVENT == github.event_name
+          ) &&
+          env.APPLY_FIXES_MODE == 'commit' &&
+          github.ref != 'refs/heads/main' &&
+          (
+            github.event_name == 'push' ||
+            github.event.pull_request.head.repo.full_name == github.repository
+          )
         with:
           branch: ${{ github.event.pull_request.head.ref || github.head_ref || github.ref }}
           commit_message: '[MegaLinter] Apply linters fixes'
