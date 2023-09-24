@@ -67,7 +67,7 @@ jobs:
 
       - name: Create matrix
         id: matrix
-        run: printf "targets=%s\n" "$(docker buildx bake --print | jq -cr '["\(.target | keys.[])"]')" >>"${GITHUB_OUTPUT}"
+        run: printf "targets=%s\n" "$(docker buildx bake --print | jq -r '"\(.target | keys)"')" >>"${GITHUB_OUTPUT}"
 
       - name: Show matrix
         run: echo '${{ steps.matrix.outputs.targets }}' | jq
