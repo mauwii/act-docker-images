@@ -46,13 +46,13 @@ documentation📖][nektosDocs]
 
 ## How I run act on my M2-Max 💻
 
-- installed HEAD Version of act via brew (since node20 support is not yet released)
+- Install act via [brew🍺](https://brew.sh)
 
   ```bash
-  brew install --HEAD act
+  brew install act
   ```
 
-- set an alias to always pass the GITHUB_TOKEN
+- set an alias to always pass the GITHUB_TOKEN (requires github-cli (`brew install gh`))
 
   ```bash
   # always add gh auth token to act
@@ -100,7 +100,7 @@ documentation📖][nektosDocs]
 - `~/.actrc`:
 
   ```text
-  --container-architecture linux/arm64
+  --rm
   -P ubuntu-latest=mauwii/ubuntu-act:latest
   -P ubuntu-22.04=mauwii/ubuntu-act:22.04
   -P ubuntu-20.04=mauwii/ubuntu-act:20.04
@@ -135,10 +135,12 @@ To execute the mega-linter locally without the needs to install it, there are di
 
   ```bash
   npx mega-linter-runner \
-      --flavor security \  # Optional, the workflow runs the full container
+      --flavor security \
       -e GITHUB_TOKEN="$(gh auth token)" \
       --remove-container
   ```
+
+  The flavor is optional, the GH Action is currently not using a flavor
 
 ## Pre-Commit-Hook
 
