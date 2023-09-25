@@ -36,7 +36,7 @@ jobs:
     steps:
       # Git Checkout
       # kics-scan ignore-line
-      - uses: actions/checkout@v4.0.0
+      - uses: actions/checkout@v4.1.0
         name: Checkout Code
         with:
           set-safe-directory: true

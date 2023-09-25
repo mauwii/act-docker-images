@@ -35,7 +35,7 @@ jobs:
     steps:
       - name: Checkout code
         # kics-scan ignore-line
-        uses: actions/checkout@v4.0.0
+        uses: actions/checkout@v4.1.0
 
       - name: Setup QEMU
         # kics-scan ignore-line
@@ -80,7 +80,7 @@ jobs:
       matrix:
         targets: ${{ fromJson(needs.test.outputs.targets) }}
     steps:
-      - uses: actions/checkout@v4.0.0
+      - uses: actions/checkout@v4.1.0
 
       - name: Free up disk space
         # kics-scan ignore-line
