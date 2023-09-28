@@ -20,16 +20,14 @@ permissions:
   pull-requests: write
 
 env:
-  REGISTRY: ${{ vars.DOCKERHUB_USERNAME && 'docker.io' || 'ghcr.io' }}
-  REGISTRY_USER: ${{ vars.DOCKERHUB_USERNAME || github.repository_owner }}
+  REGISTRY: ${{ (vars.DOCKERHUB_USERNAME != '' && secrets.DOCKERHUB_TOKEN != '') && 'docker.io' || 'ghcr.io' }}
+  REGISTRY_USER: ${{ (vars.DOCKERHUB_USERNAME != '' && secrets.DOCKERHUB_TOKEN != '') && vars.DOCKERHUB_USERNAME || github.repository_owner }}
   GITHUB_SHA: ${{ github.event.pull_request.head.sha || github.event.after || github.sha }}
   BUILDKIT_PROGRESS: plain
 
 jobs:
   test:
     runs-on: ubuntu-latest
-    env:
-      REGISTRY: ${{ vars.DOCKERHUB_USERNAME && 'docker.io' || 'ghcr.io' }}
     outputs:
       targets: ${{ steps.matrix.outputs.targets }}
     steps:
@@ -101,8 +99,8 @@ jobs:
         name: Login to ${{ env.REGISTRY }}
         with:
           registry: ${{ env.REGISTRY }}
-          username: ${{ vars.DOCKERHUB_USERNAME || github.repository_owner }}
-          password: ${{ secrets.DOCKERHUB_TOKEN || secrets.GITHUB_TOKEN }}
+          username: ${{ env.REGISTRY_USER }}
+          password: ${{ env.REGISTRY == 'docker.io' && secrets.DOCKERHUB_TOKEN || secrets.GITHUB_TOKEN }}
           logout: true
 
       # Free up space on the runner
