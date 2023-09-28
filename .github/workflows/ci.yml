@@ -82,13 +82,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4.1.0
 
-      - name: Free up disk space
-        # kics-scan ignore-line
-        uses: ./.github/actions/free-space
-        with:
-          deleteDotnet: 'true'
-          deleteAndroid: 'true'
-
       - name: Setup QEMU
         # kics-scan ignore-line
         uses: docker/setup-qemu-action@v3.0.0
@@ -112,10 +105,18 @@ jobs:
           password: ${{ secrets.DOCKERHUB_TOKEN || secrets.GITHUB_TOKEN }}
           logout: true
 
+      # Free up space on the runner
+      - name: Free up disk space
+        # kics-scan ignore-line
+        uses: ./.github/actions/free-space
+        with:
+          deleteDotnet: 'true'
+          deleteAndroid: 'true'
+
       # Bake the image
-      # kics-scan ignore-line
-      - uses: docker/bake-action@v4.0.0
-        name: Build and Push
+      - name: Build and Push
+        # kics-scan ignore-line
+        uses: docker/bake-action@v4.0.0
         id: bake
         with:
           files: docker-bake.hcl
