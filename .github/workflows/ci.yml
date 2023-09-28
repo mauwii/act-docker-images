@@ -84,13 +84,15 @@ jobs:
         uses: docker/setup-buildx-action@v3.0.0
         with:
           install: true
-          driver: docker-container
-          driver-opts: image=moby/buildkit:v0.12.2
+          driver-opts: |
+            image=moby/buildkit:latest
           # driver: ${{ github.event_name == 'pull_request' && 'docker' || 'docker-container' }}
 
       - name: Setup QEMU
         # kics-scan ignore-line
         uses: docker/setup-qemu-action@v3.0.0
+        with:
+          image: 'tonistiigi/binfmt:buildkit-latest'
 
       # Login against a container registry
       # https://github.com/docker/login-action
