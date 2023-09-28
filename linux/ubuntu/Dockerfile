@@ -4,23 +4,57 @@ ARG FROM_IMAGE=buildpack-deps
 ARG FROM_VERSION_MAJOR=22
 ARG FROM_VERSION_MINOR=04
 ARG FROM_VERSION=${FROM_VERSION_MAJOR}.${FROM_VERSION_MINOR}
-ARG BUILDKIT_SBOM_SCAN_CONTEXT=true
-FROM ${FROM_IMAGE}:${FROM_VERSION}
+FROM ${FROM_IMAGE}:${FROM_VERSION} as base
+
+FROM base as bicep
 ARG BUILDKIT_SBOM_SCAN_STAGE=true
+ARG TARGETARCH
+ARG BICEP_VERSION=v0.21.1
+RUN export targetarch="${TARGETARCH}" \
+    && if [ "${targetarch}" = "amd64" ]; then export targetarch="x64"; fi \
+    && curl -sSLo bicep "https://github.com/Azure/bicep/releases/download/${BICEP_VERSION}/bicep-linux-${targetarch}" \
+    && chmod +x ./bicep \
+    && mv ./bicep /usr/local/bin/bicep \
+    && bicep --version
+
+FROM base as golang
+ARG BUILDKIT_SBOM_SCAN_STAGE=true
+ARG TARGETARCH
+SHELL [ "/bin/bash", "--login", "-e", "-o", "pipefail", "-c" ]
+ENV PATH=/usr/local/go/bin:${PATH}
+ARG GOLANG_SHA256_amd64=cc97c28d9c252fbf28f91950d830201aa403836cbed702a05932e63f7f0c7bc4
+ARG GOLANG_SHA256_arm64=15ab379c6a2b0d086fe3e74be4599420e66549edf7426a300ee0f3809500f89e
+ARG GOLANG_VERSION=1.20.8
+RUN mkdir -p /tmp/go \
+    && curl -fsSL https://golang.org/dl/go"${GOLANG_VERSION}".linux-"${TARGETARCH}".tar.gz -o /tmp/go.tgz \
+    && go_sha="${go_sha=GOLANG_SHA256_${TARGETARCH}}" \
+    && echo "${!go_sha} /tmp/go.tgz" | sha256sum -c - \
+    && tar -C /usr/local -xzf /tmp/go.tgz \
+    && rm /tmp/go.tgz \
+    && [[ $(go version) =~ ${GOLANG_VERSION} ]]
+
+FROM base as pulumi
+ARG BUILDKIT_SBOM_SCAN_STAGE=true
+SHELL [ "/bin/bash", "--login", "-e", "-o", "pipefail", "-c" ]
+COPY --from=golang /tmp/go /usr/local/
+ENV PATH=/usr/local/go/bin:${PATH}
+ARG PULUMI_VERSION=3.83.0
+RUN curl -fsSL https://get.pulumi.com \
+    | sh -s -- --version "${PULUMI_VERSION}" \
+    && export PATH="$HOME/.pulumi/bin:$PATH" \
+    && pulumi version
+
+FROM base as act-base
 
 # automatic buildx ARGs
 ARG TARGETARCH
 
 # ARGs used before `FROM` are not accessible afterwards
 ARG FROM_IMAGE
-ARG FROM_VERSION_MAJOR
-ARG FROM_VERSION_MINOR
+ARG FROM_VERSION_MAJOR=22
+ARG FROM_VERSION_MINOR=04
 ARG FROM_VERSION=${FROM_VERSION_MAJOR}.${FROM_VERSION_MINOR}
-
-# Our custom ARGs
 ARG DISTRO=ubuntu
-ARG CODENAME
-ARG TYPE=act
 
 # Force apt to not be interactive/not ask
 ENV DEBIAN_FRONTEND=noninteractive
@@ -44,11 +78,6 @@ ENV LANG=en_US.UTF-8 \
 # enable pipefail and set workdir
 SHELL [ "/bin/bash", "--login", "-e", "-o", "pipefail", "-c" ]
 WORKDIR /tmp
-
-# create targetproc file for later use
-RUN export targetarch=${TARGETARCH} \
-    && if [ ${targetarch} = "amd64" ]; then export targetarch="x64"; fi \
-    && echo ${targetarch} >/tmp/targetproc
 
 # setup environment
 ENV AGENT_TOOLSDIRECTORY=/opt/hostedtoolcache \
@@ -125,6 +154,7 @@ RUN echo "deb https://packages.microsoft.com/ubuntu/$(lsb_release -rs)/prod $(ls
     && rm -rf /var/lib/apt/lists/*
 
 # Set .NET related environment variables
+ARG DOTNET_SDK_VERSION=6.0.414
 ENV DOTNET_CLI_TELEMETRY_OPTOUT=1 \
     DOTNET_GENERATE_ASPNET_CERTIFICATE=false \
     DOTNET_HOST_PATH=${AGENT_TOOLSDIRECTORY}/dotnet/dotnet \
@@ -132,7 +162,7 @@ ENV DOTNET_CLI_TELEMETRY_OPTOUT=1 \
     DOTNET_NOLOGO=true \
     DOTNET_ROLL_FORWARD=Major \
     DOTNET_ROOT=${AGENT_TOOLSDIRECTORY}/dotnet \
-    DOTNET_SDK_VERSION=6.0.414 \
+    DOTNET_SDK_VERSION=${DOTNET_SDK_VERSION} \
     DOTNET_USE_POLLING_FILE_WATCHER=true \
     NUGET_XMLDOC_MODE=skip \
     NUGET_PACKAGES=${AGENT_TOOLSDIRECTORY}/nugetpackages \
@@ -157,23 +187,6 @@ RUN printf "Package: *net*\nPin: origin packages.microsoft.com\nPin-Priority: 10
     && rm -rf /etc/apt/sources.list.d/* \
     && rm -rf /var/lib/apt/lists/*
 
-# Install PowerShell global tool
-RUN export powershell_version=7.2.13 \
-    && export tool_path=/usr/share/powershell \
-    && pwsh_nupkg="PowerShell.Linux.$(cat /tmp/targetproc).${powershell_version}.nupkg" \
-    && export pwsh_nupkg \
-    && curl -fsSLO "https://pwshtool.blob.core.windows.net/tool/${powershell_version}/${pwsh_nupkg}" \
-    && dotnet tool install \
-        --add-source / \
-        --tool-path "${tool_path}" \
-        --version "${powershell_version}" \
-        PowerShell.Linux."$(cat /tmp/targetproc)" \
-    && dotnet nuget locals all --clear \
-    && rm "${pwsh_nupkg}" \
-    && ln -s "${tool_path}/pwsh" /usr/bin/pwsh \
-    && chmod 755 "${tool_path}/pwsh" \
-    && find "${tool_path}" -print | grep -i '.*[.]nupkg$' | xargs rm
-
 # Install Github CLI
 RUN curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
     | dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg \
@@ -189,13 +202,15 @@ RUN curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
 
 # Install Azure CLI
 RUN [[ $(curl -sL https://packages.microsoft.com/repos/azure-cli/dists/) =~ $(lsb_release -cs) ]] \
-    && (echo "deb [arch=$(dpkg --print-architecture)] https://packages.microsoft.com/repos/azure-cli/ $(lsb_release -cs) main" \
+    && (export targetarch=${TARGETARCH} \
+        && if [ ${targetarch} = "amd64" ]; then export targetarch="x64"; fi \
+        && echo "deb [arch=$(dpkg --print-architecture)] https://packages.microsoft.com/repos/azure-cli/ $(lsb_release -cs) main" \
         | tee /etc/apt/sources.list.d/azure.list \
         && apt-get -y update &>/dev/null \
         && apt-get -y install --no-install-recommends \
             azure-cli \
         && az extension add -n azure-devops \
-        && az bicep install --target-platform "linux-$(cat /tmp/targetproc)" \
+        && az bicep install --target-platform "linux-${targetarch}" \
         && az config set bicep.use_binary_from_path=true \
         && az config set auto-upgrade.enable=no \
         && az config set auto-upgrade.prompt=no \
@@ -205,30 +220,10 @@ RUN [[ $(curl -sL https://packages.microsoft.com/repos/azure-cli/dists/) =~ $(ls
         && rm -rf /var/lib/apt/lists/*) \
     || echo "Azure CLI not available for this distribution"
 
-# install bicep-cli
-RUN curl -sSLo bicep https://github.com/Azure/bicep/releases/latest/download/bicep-linux-"$(cat /tmp/targetproc)" \
-    && chmod +x ./bicep \
-    && mv ./bicep /usr/local/bin/bicep
-
-# Add toolset.json
-ARG TOOLSET=/imagegeneration/toolset.json
-COPY linux/${DISTRO}/toolsets/${FROM_VERSION_MAJOR}${FROM_VERSION_MINOR}.json ${TOOLSET}
-
-# install apt packages from toolset
-# hadolint ignore=SC2207
-RUN apt-get -y update &>/dev/null \
-    && packages=() \
-    && while IFS='' read -r line; do packages+=("${line}"); done < <(jq -r '.apt|.vital_packages[],.common_packages[],.cmd_packages[]' ${TOOLSET}) \
-    && apt-get -y install --no-install-recommends \
-        "${packages[@]}" \
-    && apt-get clean \
-    && rm -rf /etc/apt/sources.list.d/* \
-    && rm -rf /var/lib/apt/lists/*
-
 # Install default NodeJS and toolset node_modules
+ARG NODE_VERSION=20
 RUN curl -fsSL https://raw.githubusercontent.com/tj/n/master/bin/n -o ~/n \
-    && defaultVersion=$(jq -r '.node.default' ${TOOLSET}) \
-    && bash ~/n "${defaultVersion}" \
+    && bash ~/n "${NODE_VERSION}" \
     && rm -rf ~/n \
     && chmod -R 777 /usr/local/lib/node_modules \
     && chmod -R 777 /usr/local/bin \
@@ -246,11 +241,6 @@ RUN curl -sS https://dl.yarnpkg.com/debian/pubkey.gpg \
     && rm -rf /etc/apt/sources.list.d/* \
     && rm -rf /var/lib/apt/lists/* \
     && yarn --version
-
-# Trust PSGallery and install Powershell-/Azure Modules
-RUN pwsh -NonInteractive -Command "Set-PSRepository -Name PSGallery -InstallationPolicy Trusted" \
-    && while IFS='' read -r pwshModule; do echo "installing ${pwshModule}" && pwsh -NonInteractive -Command "Install-Module -Name ${pwshModule} -Scope AllUsers -Repository PSGallery"; done < <(jq -r '.powershellModules[].name' ${TOOLSET}) \
-    && while IFS='' read -r azVersion; do echo "installing Az ${azVersion}" && pwsh -NonInteractive -Command "Install-Module -Name Az -RequiredVersion ${azVersion} -Scope AllUsers -Repository PSGallery"; done < <(jq -r '.azureModules[].versions[]' ${TOOLSET})
 
 # install python 3, pip, venv, pipx
 ENV PIPX_BIN_DIR=/opt/pipx_bin \
@@ -271,33 +261,95 @@ RUN apt-get -y update &>/dev/null \
     && rm -rf /etc/apt/sources.list.d/* \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Go
-ENV PATH=/usr/local/go/bin:${PATH}
-# hadolint ignore=SC2086
-ARG GOLANG_SHA256_amd64=cc97c28d9c252fbf28f91950d830201aa403836cbed702a05932e63f7f0c7bc4
-ARG GOLANG_SHA256_arm64=15ab379c6a2b0d086fe3e74be4599420e66549edf7426a300ee0f3809500f89e
-ARG GOLANG_VERSION=1.20.8
-RUN curl -fsSL https://golang.org/dl/go"${GOLANG_VERSION}".linux-"${TARGETARCH}".tar.gz -o /tmp/go.tgz \
-    && go_sha="${go_sha=GOLANG_SHA256_${TARGETARCH}}" \
-    && echo "${!go_sha} /tmp/go.tgz" | sha256sum -c - \
-    && tar -C /usr/local -xzf /tmp/go.tgz \
-    && rm /tmp/go.tgz \
-    && go version \
-    && sed "s|^PATH=|PATH=/usr/local/go/bin:|mg" -i /etc/environment
-
-# Install latest Pulumi
-RUN curl -fsSL https://get.pulumi.com | sh \
-    && mv ~/.pulumi/bin/* /usr/local/bin \
-    && pulumi version
-
 # cleanup step
 RUN apt-get -y clean \
     && rm -rf \
         /var/cache/* \
         /var/log/* \
         /var/lib/apt/lists/* \
+        /etc/apt/sources.list.d/* \
         /tmp/* \
     || echo 'Failed to delete directories'
+
+# kics-scan ignore-line
+FROM act-base as powershell
+ARG BUILDKIT_SBOM_SCAN_STAGE=true
+ARG FROM_VERSION_MAJOR=22
+ARG FROM_VERSION_MINOR=04
+ARG FROM_VERSION=${FROM_VERSION_MAJOR}.${FROM_VERSION_MINOR}
+ARG DISTRO=ubuntu
+SHELL [ "/bin/bash", "--login", "-e", "-o", "pipefail", "-c" ]
+
+# Install PowerShell global tool
+ARG TARGETARCH
+ARG POWERSHELL_VERSION=7.2.13
+ARG TOOL_PATH_PWSH=/usr/share/powershell
+RUN export targetarch=${TARGETARCH} \
+    && if [ ${targetarch} = "amd64" ]; then export targetarch="x64"; fi \
+    && pwsh_nupkg="PowerShell.Linux.${targetarch}.${POWERSHELL_VERSION}.nupkg" \
+    && export pwsh_nupkg \
+    && curl -fsSLO "https://pwshtool.blob.core.windows.net/tool/${POWERSHELL_VERSION}/${pwsh_nupkg}" \
+    && dotnet tool install \
+        --add-source / \
+        --tool-path "${TOOL_PATH_PWSH}" \
+        --version "${POWERSHELL_VERSION}" \
+        "PowerShell.Linux.${targetarch}" \
+    && dotnet nuget locals all --clear \
+    && rm "${pwsh_nupkg}" \
+    && ln -s "${TOOL_PATH_PWSH}/pwsh" /usr/bin/pwsh \
+    && chmod 755 "${TOOL_PATH_PWSH}/pwsh"
+
+# Add toolset.json
+ARG TOOLSET=/imagegeneration/toolset.json
+COPY linux/${DISTRO}/toolsets/${FROM_VERSION_MAJOR}${FROM_VERSION_MINOR}.json ${TOOLSET}
+
+# Trust PSGallery and install Powershell-/Azure Modules
+RUN pwsh -NonInteractive -Command "Set-PSRepository -Name PSGallery -InstallationPolicy Trusted" \
+    && while IFS='' read -r pwshModule; do echo "installing ${pwshModule}" && pwsh -NonInteractive -Command "Install-Module -Name ${pwshModule} -Scope AllUsers -Repository PSGallery"; done < <(jq -r '.powershellModules[].name' ${TOOLSET}) \
+    && while IFS='' read -r azVersion; do echo "installing Az ${azVersion}" && pwsh -NonInteractive -Command "Install-Module -Name Az -RequiredVersion ${azVersion} -Scope AllUsers -Repository PSGallery"; done < <(jq -r '.azureModules[].versions[]' ${TOOLSET})
+
+# kics-scan ignore-line
+FROM act-base as act
+ARG BUILDKIT_SBOM_SCAN_STAGE=true
+SHELL [ "/bin/bash", "--login", "-e", "-o", "pipefail", "-c" ]
+WORKDIR /tmp
+
+# Add toolset.json
+ARG FROM_VERSION_MAJOR=22
+ARG FROM_VERSION_MINOR=04
+ARG DISTRO=ubuntu
+ARG TOOLSET=/imagegeneration/toolset.json
+COPY linux/${DISTRO}/toolsets/${FROM_VERSION_MAJOR}${FROM_VERSION_MINOR}.json ${TOOLSET}
+
+# install apt packages from toolset
+# hadolint ignore=SC2207
+RUN apt-get -y update &>/dev/null \
+    && packages=() \
+    && while IFS='' read -r line; do packages+=("${line}"); done < <(jq -r '.apt|.vital_packages[],.common_packages[],.cmd_packages[]' ${TOOLSET}) \
+    && apt-get -y install --no-install-recommends \
+        "${packages[@]}" \
+    && apt-get clean \
+    && rm -rf /etc/apt/sources.list.d/* \
+    && rm -rf /var/lib/apt/lists/*
+
+# add Powershell and Modules
+ARG TOOL_PATH_PWSH=/usr/share/powershell
+COPY --from=powershell /usr/local/share/powershell /usr/local/share/powershell
+COPY --from=powershell ${TOOL_PATH_PWSH} ${TOOL_PATH_PWSH}
+RUN ln -s "${TOOL_PATH_PWSH}/pwsh" /usr/bin/pwsh \
+    && chmod 755 "${TOOL_PATH_PWSH}/pwsh" \
+    && find "${TOOL_PATH_PWSH}" -print | grep -i '.*[.]nupkg$' | xargs rm
+
+# add go
+COPY --from=golang /usr/local/go /usr/local/go
+ENV PATH=/usr/local/go/bin:${PATH}
+RUN sed "s|^PATH=|PATH=/usr/local/go/bin:|mg" -i /etc/environment
+
+# add pulumi
+COPY --from=pulumi /root/.pulumi/bin/* /usr/local/bin/
+
+# add bicep
+COPY --from=bicep /usr/local/bin/bicep /usr/local/bin/bicep
 
 ARG RUNNER
 USER ${RUNNER}

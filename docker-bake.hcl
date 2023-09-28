@@ -2,12 +2,12 @@ variable "REGISTRY" {
   default = "docker.io"
 }
 
-variable "REPOSITORY_OWNER" {
+variable "GITHUB_REPOSITORY_OWNER" {
   default = "mauwii"
 }
 
 variable "REPOSITORY" {
-  default = "${REPOSITORY_OWNER}/act-docker-images"
+  default = "${GITHUB_REPOSITORY_OWNER}/act-docker-images"
 }
 
 variable "REPOSITORY_URL" {
@@ -30,10 +30,21 @@ variable "GITHUB_BASE_REF" {
   default = null
 }
 
+variable "GITHUB_ACTOR" {
+  default = GITHUB_REPOSITORY_OWNER
+}
+
 variable "FROM_IMAGE" {
   default = "buildpack-deps"
 }
 
+variable "BICEP_VERSION" {
+  default = "v0.21.1"
+}
+
+variable "DOTNET_SDK_VERSION" {
+  default = "6.0.414"
+}
 variable "GO_VERSION" {
   default = "1.20.8"
 }
@@ -44,6 +55,18 @@ variable "GOLANG_GITHUB_SHA256_amd64" {
 
 variable "GOLANG_GITHUB_SHA256_arm64" {
   default = "15ab379c6a2b0d086fe3e74be4599420e66549edf7426a300ee0f3809500f89e"
+}
+
+variable "NODE_VERSION" {
+  default = "20"
+}
+
+variable "PULUMI_VERSION" {
+  default = "3.83.0"
+}
+
+variable "POWERSHELL_VERSION" {
+  default = "7.2.13"
 }
 
 group "default" {
@@ -69,38 +92,43 @@ target "ubuntu" {
     ]
   }
   args = {
+    BICEP_VERSION              = BICEP_VERSION
     CODENAME                   = release.codename
     DISTRO                     = "ubuntu"
-    FROM_IMAGE                 = "${FROM_IMAGE}"
+    DOTNET_SDK_VERSION         = DOTNET_SDK_VERSION
+    FROM_IMAGE                 = FROM_IMAGE
     FROM_VERSION_MAJOR         = release.major
     FROM_VERSION_MINOR         = release.minor
-    GO_VERSION                 = "${GO_VERSION}"
-    GOLANG_GITHUB_SHA256_amd64 = "${GOLANG_GITHUB_SHA256_amd64}"
-    GOLANG_GITHUB_SHA256_arm64 = "${GOLANG_GITHUB_SHA256_arm64}"
+    GO_VERSION                 = GO_VERSION
+    GOLANG_GITHUB_SHA256_amd64 = GOLANG_GITHUB_SHA256_amd64
+    GOLANG_GITHUB_SHA256_arm64 = GOLANG_GITHUB_SHA256_arm64
+    NODE_VERSION               = NODE_VERSION
+    PULUMI_VERSION             = PULUMI_VERSION
+    TOOL_PATH_PWSH             = "/usr/share/powershell"
   }
   name = "ubuntu-act-${release.codename}"
   cache-from = [
-    "${REGISTRY}/${REPOSITORY_OWNER}/ubuntu-act:cache-${release.codename}"
+    "${REGISTRY}/${GITHUB_REPOSITORY_OWNER}/ubuntu-act:cache-${release.codename}"
   ]
   cache-to = [
-    notequal(REF_NAME, "local") ? "${REGISTRY}/${REPOSITORY_OWNER}/ubuntu-act:cache-${release.codename}" : ""
+    notequal(REF_NAME, "local") ? "${REGISTRY}/${GITHUB_REPOSITORY_OWNER}/ubuntu-act:cache-${release.codename}" : ""
   ]
   tags = [
-    "${REGISTRY}/${REPOSITORY_OWNER}/ubuntu-act:${release.major}.${release.minor}-${and(notequal(REF_NAME, ""), notequal(REF_NAME, null)) ? REF_NAME : "local"}",
-    and(notequal(GITHUB_SHA, null), equal("${REF_NAME}", "main")) ? "${REGISTRY}/${REPOSITORY_OWNER}/ubuntu-act:${release.major}.${release.minor}-${substr(GITHUB_SHA, 0, 7)}" : "",
-    equal("${REF_NAME}", "main") ? "${REGISTRY}/${REPOSITORY_OWNER}/ubuntu-act:${release.major}.${release.minor}" : "",
-    and(equal("${REF_NAME}", "main"), equal(release.codename, "jammy")) ? "${REGISTRY}/${REPOSITORY_OWNER}/ubuntu-act:latest" : "",
+    "${REGISTRY}/${GITHUB_REPOSITORY_OWNER}/ubuntu-act:${release.major}.${release.minor}-${and(notequal(REF_NAME, ""), notequal(REF_NAME, null)) ? REF_NAME : "local"}",
+    and(notequal(GITHUB_SHA, null), equal("${REF_NAME}", "main")) ? "${REGISTRY}/${GITHUB_REPOSITORY_OWNER}/ubuntu-act:${release.major}.${release.minor}-${substr(GITHUB_SHA, 0, 7)}" : "",
+    equal("${REF_NAME}", "main") ? "${REGISTRY}/${GITHUB_REPOSITORY_OWNER}/ubuntu-act:${release.major}.${release.minor}" : "",
+    and(equal("${REF_NAME}", "main"), equal(release.codename, "jammy")) ? "${REGISTRY}/${GITHUB_REPOSITORY_OWNER}/ubuntu-act:latest" : "",
   ]
   labels = {
-    "org.opencontainers.image.authors"       = REPOSITORY_OWNER
+    "org.opencontainers.image.authors"       = notequal(GITHUB_REPOSITORY_OWNER, GITHUB_ACTOR) ? "${GITHUB_REPOSITORY_OWNER}, ${GITHUB_ACTOR}" : GITHUB_REPOSITORY_OWNER
     "org.opencontainers.image.created"       = timestamp()
     "org.opencontainers.image.description"   = "This Image is made to be used with Nektos/act to run your GH-Workflows locally"
     "org.opencontainers.image.documentation" = REPOSITORY_URL
     "org.opencontainers.image.revision"      = GITHUB_SHA
     "org.opencontainers.image.source"        = and(and(notequal(REPOSITORY_URL, ""), notequal(REPOSITORY_URL, null)), and(notequal(GITHUB_SHA, ""), notequal(GITHUB_SHA, null))) ? "${REPOSITORY_URL}/blob/${GITHUB_SHA}/linux/ubuntu/Dockerfile" : null
     "org.opencontainers.image.title"         = "ubuntu-act-${release.codename}"
-    "org.opencontainers.image.url"           = equal("${REGISTRY}", "docker.io") ? "https://hub.docker.com/r/${REPOSITORY_OWNER}/ubuntu-act" : equal("${REGISTRY}", "ghcr.io") ? "https://github.com/${REPOSITORY}/pkgs/container/ubuntu-act" : null
-    "org.opencontainers.image.vendor"        = "${REPOSITORY_OWNER}"
+    "org.opencontainers.image.url"           = equal(REGISTRY, "docker.io") ? "https://hub.docker.com/r/${GITHUB_REPOSITORY_OWNER}/ubuntu-act" : equal("${REGISTRY}", "ghcr.io") ? "https://github.com/${REPOSITORY}/pkgs/container/ubuntu-act" : null
+    "org.opencontainers.image.vendor"        = GITHUB_REPOSITORY_OWNER
   }
 }
 

@@ -7,9 +7,9 @@
     "**/tmp/**",
     "**/megalinter-reports/**",
     "**/.editorconfig",
-    "**.hcl"
+    "**/docker-bake.hcl"
   ],
-  "language": "en,en-GB",
+  "language": "en,en-US",
   "words": [
     "actrc",
     "aliyun",
@@ -37,6 +37,7 @@
     "dearmor",
     "dearmour",
     "didnt",
+    "distro",
     "dnsutils",
     "dockerhub",
     "dpkg",
@@ -54,6 +55,7 @@
     "imagename",
     "imagetools",
     "iputils",
+    "keyrings",
     "keyscan",
     "kics",
     "libc",
@@ -81,6 +83,7 @@
     "mediainfo",
     "mediatypes",
     "mergify",
+    "moby",
     "multiarch",
     "myrepo",
     "nbgv",
@@ -118,6 +121,7 @@
     "texinfo",
     "toolcache",
     "TOOLSDIRECTORY",
+    "toolset",
     "toolsets",
     "trivy",
     "trivyignore",
