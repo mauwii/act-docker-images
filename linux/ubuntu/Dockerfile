@@ -287,6 +287,7 @@ RUN dotnet tool install \
     && chmod 755 "${TOOL_PATH_PWSH}/pwsh" \
     && [[ "$(pwsh --version)" =~ ${POWERSHELL_VERSION} ]]
 
+# kics-scan ignore-line
 FROM powershell as powershell-modules
 ARG TARGETARCH
 SHELL [ "/bin/bash", "--login", "-e", "-o", "pipefail", "-c" ]
