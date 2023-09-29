@@ -45,6 +45,11 @@ variable "BICEP_VERSION" {
 variable "DOTNET_SDK_VERSION" {
   default = "6.0.414"
 }
+
+variable "DEPENDENCIES" {
+  default = "[\"acl\",\"apt-transport-https\",\"aria2\",\"bison\",\"brotli\",\"dbus\",\"dnsutils\",\"fakeroot\",\"flex\",\"fonts-noto-color-emoji\",\"ftp\",\"gawk\",\"gnupg-agent\",\"gnupg2\",\"haveged\",\"iproute2\",\"iputils-ping\",\"libc++-dev\",\"libc++abi-dev\",\"libc6-dev\",\"libgbm-dev\",\"libgconf-2-4\",\"libgsl-dev\",\"libgtk-3-0\",\"libmagic-dev\",\"libsecret-1-dev\",\"libssl-dev\",\"libunwind8\",\"libxkbfile-dev\",\"libxss1\",\"libyaml-dev\",\"lz4\",\"mediainfo\",\"net-tools\",\"netcat\",\"p7zip-full\",\"p7zip-rar\",\"parallel\",\"pass\",\"patchelf\",\"pigz\",\"pollinate\",\"python-is-python3\",\"rpm\",\"rsync\",\"shellcheck\",\"software-properties-common\",\"sphinxsearch\",\"sqlite3\",\"ssh\",\"sshpass\",\"subversion\",\"sudo\",\"swig\",\"telnet\",\"texinfo\",\"time\",\"tk\",\"unzip\",\"upx\",\"xorriso\",\"xvfb\",\"xz-utils\",\"zip\",\"zstd\",\"zsync\"]"
+}
+
 variable "GO_VERSION" {
   default = "1.20.8"
 }
@@ -62,16 +67,25 @@ variable "NODE_VERSION" {
 }
 
 variable "PULUMI_VERSION" {
-  default = "3.83.0"
+  default = "3.86.0"
+}
+
+variable "POWERSHELL_AZ_MODULE_VERSIONS" {
+  default = "[\"9.3.0\"]"
 }
 
 variable "POWERSHELL_VERSION" {
   default = "7.2.13"
 }
 
+variable "POWERSHELL_MODULES" {
+  default = "[\"MarkdownPS\",\"Microsoft.Graph\",\"Pester\",\"PSScriptAnalyzer\"]"
+}
+
 group "default" {
-  targets = ["ubuntu"]
-  context = "."
+  targets = [
+    "ubuntu"
+  ]
 }
 
 target "ubuntu" {
@@ -92,19 +106,22 @@ target "ubuntu" {
     ]
   }
   args = {
-    BICEP_VERSION              = BICEP_VERSION
-    CODENAME                   = release.codename
-    DISTRO                     = "ubuntu"
-    DOTNET_SDK_VERSION         = DOTNET_SDK_VERSION
-    FROM_IMAGE                 = FROM_IMAGE
-    FROM_VERSION_MAJOR         = release.major
-    FROM_VERSION_MINOR         = release.minor
-    GO_VERSION                 = GO_VERSION
-    GOLANG_GITHUB_SHA256_amd64 = GOLANG_GITHUB_SHA256_amd64
-    GOLANG_GITHUB_SHA256_arm64 = GOLANG_GITHUB_SHA256_arm64
-    NODE_VERSION               = NODE_VERSION
-    PULUMI_VERSION             = PULUMI_VERSION
-    TOOL_PATH_PWSH             = "/usr/share/powershell"
+    BICEP_VERSION                 = BICEP_VERSION
+    CODENAME                      = release.codename
+    DEPENDENCIES                  = DEPENDENCIES
+    DISTRO                        = "ubuntu"
+    DOTNET_SDK_VERSION            = DOTNET_SDK_VERSION
+    FROM_IMAGE                    = FROM_IMAGE
+    FROM_VERSION_MAJOR            = release.major
+    FROM_VERSION_MINOR            = release.minor
+    GO_VERSION                    = GO_VERSION
+    GOLANG_GITHUB_SHA256_amd64    = GOLANG_GITHUB_SHA256_amd64
+    GOLANG_GITHUB_SHA256_arm64    = GOLANG_GITHUB_SHA256_arm64
+    NODE_VERSION                  = NODE_VERSION
+    POWERSHELL_AZ_MODULE_VERSIONS = POWERSHELL_AZ_MODULE_VERSIONS
+    POWERSHELL_MODULES            = POWERSHELL_MODULES
+    PULUMI_VERSION                = PULUMI_VERSION
+    TOOL_PATH_PWSH                = "/usr/share/powershell"
   }
   name = "ubuntu-act-${release.codename}"
   cache-from = [
@@ -114,7 +131,7 @@ target "ubuntu" {
     notequal(REF_NAME, "local") ? "${REGISTRY}/${GITHUB_REPOSITORY_OWNER}/ubuntu-act:cache-${release.codename}" : ""
   ]
   tags = [
-    "${REGISTRY}/${GITHUB_REPOSITORY_OWNER}/ubuntu-act:${release.major}.${release.minor}-${and(notequal(REF_NAME, ""), notequal(REF_NAME, null)) ? REF_NAME : "local"}",
+    "${REGISTRY}/${GITHUB_REPOSITORY_OWNER}/ubuntu-act:${release.major}.${release.minor}-${REF_NAME}",
     and(notequal(GITHUB_SHA, null), equal("${REF_NAME}", "main")) ? "${REGISTRY}/${GITHUB_REPOSITORY_OWNER}/ubuntu-act:${release.major}.${release.minor}-${substr(GITHUB_SHA, 0, 7)}" : "",
     equal("${REF_NAME}", "main") ? "${REGISTRY}/${GITHUB_REPOSITORY_OWNER}/ubuntu-act:${release.major}.${release.minor}" : "",
     and(equal("${REF_NAME}", "main"), equal(release.codename, "jammy")) ? "${REGISTRY}/${GITHUB_REPOSITORY_OWNER}/ubuntu-act:latest" : "",

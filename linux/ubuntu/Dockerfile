@@ -7,7 +7,6 @@ ARG FROM_VERSION=${FROM_VERSION_MAJOR}.${FROM_VERSION_MINOR}
 FROM ${FROM_IMAGE}:${FROM_VERSION} as base
 
 FROM base as bicep
-ARG BUILDKIT_SBOM_SCAN_STAGE=true
 ARG TARGETARCH
 ARG BICEP_VERSION=v0.21.1
 RUN export targetarch="${TARGETARCH}" \
@@ -18,7 +17,6 @@ RUN export targetarch="${TARGETARCH}" \
     && bicep --version
 
 FROM base as golang
-ARG BUILDKIT_SBOM_SCAN_STAGE=true
 ARG TARGETARCH
 SHELL [ "/bin/bash", "--login", "-e", "-o", "pipefail", "-c" ]
 ENV PATH=/usr/local/go/bin:${PATH}
@@ -34,9 +32,9 @@ RUN mkdir -p /tmp/go \
     && [[ $(go version) =~ ${GOLANG_VERSION} ]]
 
 FROM base as pulumi
-ARG BUILDKIT_SBOM_SCAN_STAGE=true
+ARG TARGETARCH
 SHELL [ "/bin/bash", "--login", "-e", "-o", "pipefail", "-c" ]
-COPY --from=golang /tmp/go /usr/local/
+COPY --from=golang /usr/local/go /usr/local/go
 ENV PATH=/usr/local/go/bin:${PATH}
 ARG PULUMI_VERSION=3.83.0
 RUN curl -fsSL https://get.pulumi.com \
@@ -103,8 +101,10 @@ RUN ssh-keyscan github.com >>/etc/ssh/ssh_known_hosts \
     && ssh-keyscan ssh.dev.azure.com >>/etc/ssh/ssh_known_hosts
 
 # Install dependencies
+ARG DEPENDENCIES
 RUN apt-get -y update &>/dev/null \
-    && packages=(gawk sudo jq gnupg-agent ca-certificates software-properties-common apt-transport-https zstd zip unzip xz-utils) \
+    && apt-get -y install --no-install-recommends jq && packages=() \
+    && while IFS='' read -r pkg; do echo "adding $pkg" && packages+=("$pkg"); done < <(echo "${DEPENDENCIES}" | jq -r '.[]') \
     && apt-get -y install --no-install-recommends \
         "${packages[@]}" \
     && apt-get clean \
@@ -220,7 +220,7 @@ RUN [[ $(curl -sL https://packages.microsoft.com/repos/azure-cli/dists/) =~ $(ls
         && rm -rf /var/lib/apt/lists/*) \
     || echo "Azure CLI not available for this distribution"
 
-# Install default NodeJS and toolset node_modules
+# Install default NodeJS
 ARG NODE_VERSION=20
 RUN curl -fsSL https://raw.githubusercontent.com/tj/n/master/bin/n -o ~/n \
     && bash ~/n "${NODE_VERSION}" \
@@ -273,72 +273,43 @@ RUN apt-get -y clean \
 
 # kics-scan ignore-line
 FROM act-base as powershell
-ARG BUILDKIT_SBOM_SCAN_STAGE=true
-ARG FROM_VERSION_MAJOR=22
-ARG FROM_VERSION_MINOR=04
-ARG FROM_VERSION=${FROM_VERSION_MAJOR}.${FROM_VERSION_MINOR}
-ARG DISTRO=ubuntu
 SHELL [ "/bin/bash", "--login", "-e", "-o", "pipefail", "-c" ]
-
 # Install PowerShell global tool
 ARG TARGETARCH
 ARG POWERSHELL_VERSION=7.2.13
 ARG TOOL_PATH_PWSH=/usr/share/powershell
-RUN export targetarch=${TARGETARCH} \
-    && if [ ${targetarch} = "amd64" ]; then export targetarch="x64"; fi \
-    && pwsh_nupkg="PowerShell.Linux.${targetarch}.${POWERSHELL_VERSION}.nupkg" \
-    && export pwsh_nupkg \
-    && curl -fsSLO "https://pwshtool.blob.core.windows.net/tool/${POWERSHELL_VERSION}/${pwsh_nupkg}" \
-    && dotnet tool install \
-        --add-source / \
-        --tool-path "${TOOL_PATH_PWSH}" \
-        --version "${POWERSHELL_VERSION}" \
-        "PowerShell.Linux.${targetarch}" \
-    && dotnet nuget locals all --clear \
-    && rm "${pwsh_nupkg}" \
-    && ln -s "${TOOL_PATH_PWSH}/pwsh" /usr/bin/pwsh \
-    && chmod 755 "${TOOL_PATH_PWSH}/pwsh"
+RUN dotnet tool install \
+    --tool-path "${TOOL_PATH_PWSH}" \
+    --version "${POWERSHELL_VERSION}" \
+    PowerShell \
+    && find "${TOOL_PATH_PWSH}" -print | grep -i '.*[.]nupkg$' | xargs rm \
+    && ln -s "${TOOL_PATH_PWSH}/pwsh" /usr/local/bin/pwsh \
+    && chmod 755 "${TOOL_PATH_PWSH}/pwsh" \
+    && [[ "$(pwsh --version)" =~ ${POWERSHELL_VERSION} ]]
 
-# Add toolset.json
-ARG TOOLSET=/imagegeneration/toolset.json
-COPY linux/${DISTRO}/toolsets/${FROM_VERSION_MAJOR}${FROM_VERSION_MINOR}.json ${TOOLSET}
-
+FROM powershell as powershell-modules
+ARG TARGETARCH
+SHELL [ "/bin/bash", "--login", "-e", "-o", "pipefail", "-c" ]
+ARG POWERSHELL_MODULES
+ARG POWERSHELL_AZ_MODULE_VERSIONS
 # Trust PSGallery and install Powershell-/Azure Modules
 RUN pwsh -NonInteractive -Command "Set-PSRepository -Name PSGallery -InstallationPolicy Trusted" \
-    && while IFS='' read -r pwshModule; do echo "installing ${pwshModule}" && pwsh -NonInteractive -Command "Install-Module -Name ${pwshModule} -Scope AllUsers -Repository PSGallery"; done < <(jq -r '.powershellModules[].name' ${TOOLSET}) \
-    && while IFS='' read -r azVersion; do echo "installing Az ${azVersion}" && pwsh -NonInteractive -Command "Install-Module -Name Az -RequiredVersion ${azVersion} -Scope AllUsers -Repository PSGallery"; done < <(jq -r '.azureModules[].versions[]' ${TOOLSET})
+    && while IFS='' read -r pwshModule; do echo "installing ${pwshModule}" && pwsh -NonInteractive -Command "Install-Module -Name ${pwshModule} -Scope AllUsers -Repository PSGallery"; done < <(echo "${POWERSHELL_MODULES}" | jq -r '.[]') \
+    && while IFS='' read -r azVersion; do echo "installing Az ${azVersion}" && pwsh -NonInteractive -Command "Install-Module -Name Az -RequiredVersion ${azVersion} -Scope AllUsers -Repository PSGallery"; done < <(echo "${POWERSHELL_AZ_MODULE_VERSIONS}" | jq -r '.[]')
 
 # kics-scan ignore-line
 FROM act-base as act
-ARG BUILDKIT_SBOM_SCAN_STAGE=true
+ARG TARGETARCH
 SHELL [ "/bin/bash", "--login", "-e", "-o", "pipefail", "-c" ]
 WORKDIR /tmp
 
-# Add toolset.json
-ARG FROM_VERSION_MAJOR=22
-ARG FROM_VERSION_MINOR=04
-ARG DISTRO=ubuntu
-ARG TOOLSET=/imagegeneration/toolset.json
-COPY linux/${DISTRO}/toolsets/${FROM_VERSION_MAJOR}${FROM_VERSION_MINOR}.json ${TOOLSET}
-
-# install apt packages from toolset
-# hadolint ignore=SC2207
-RUN apt-get -y update &>/dev/null \
-    && packages=() \
-    && while IFS='' read -r line; do packages+=("${line}"); done < <(jq -r '.apt|.vital_packages[],.common_packages[],.cmd_packages[]' ${TOOLSET}) \
-    && apt-get -y install --no-install-recommends \
-        "${packages[@]}" \
-    && apt-get clean \
-    && rm -rf /etc/apt/sources.list.d/* \
-    && rm -rf /var/lib/apt/lists/*
-
-# add Powershell and Modules
+# add PowerShell
 ARG TOOL_PATH_PWSH=/usr/share/powershell
-COPY --from=powershell /usr/local/share/powershell /usr/local/share/powershell
 COPY --from=powershell ${TOOL_PATH_PWSH} ${TOOL_PATH_PWSH}
-RUN ln -s "${TOOL_PATH_PWSH}/pwsh" /usr/bin/pwsh \
-    && chmod 755 "${TOOL_PATH_PWSH}/pwsh" \
-    && find "${TOOL_PATH_PWSH}" -print | grep -i '.*[.]nupkg$' | xargs rm
+RUN ln -s "${TOOL_PATH_PWSH}/pwsh" /usr/local/bin/pwsh
+
+# add  PowerShell-modules
+COPY --from=powershell-modules /usr/local/share/powershell /usr/local/share/powershell
 
 # add go
 COPY --from=golang /usr/local/go /usr/local/go

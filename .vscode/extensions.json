@@ -5,9 +5,10 @@
     "exiasr.hadolint",
     "foxundermoon.shell-format",
     "github.vscode-github-actions",
+    "hashicorp.hcl",
     "mads-hartmann.bash-ide-vscode",
     "ms-azuretools.vscode-docker",
-    "MS-CST-E.vscode-devskim",
+    "ms-cst-e.vscode-devskim",
     "streetsidesoftware.code-spell-checker"
   ]
 }

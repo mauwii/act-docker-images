@@ -12,7 +12,6 @@
     "**/report/**",
     "**/*.svg",
     "**/tmp/**",
-    "**/megalinter-reports/**",
-    "**/linux/*/toolsets/*.json"
+    "**/megalinter-reports/**"
   ]
 }
