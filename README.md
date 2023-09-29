@@ -41,7 +41,7 @@ The easiest way is to add those lines in your `~/.actrc`:
 -P ubuntu-20.04=mauwii/ubuntu-act:20.04
 ```
 
-For further Informations about nektos/act and how to use it, take a 👀 at the [nektos
+For further information about [nektos/act][nektosActRepo] and how to use it, take a 👀 at the [nektos
 documentation📖][nektosDocs]
 
 ## How I run act on my M2-Max 💻

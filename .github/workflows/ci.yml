@@ -121,7 +121,31 @@ jobs:
           targets: ${{ matrix.targets }}
           sbom: true
           provenance: true
-          push: ${{ github.event_name != 'pull_request' }}
+          push: ${{ github.event_name != 'pull_request' && github.actor != 'nektos/act' }}
+
+      - name: Get the image tag
+        id: meta
+        run: |
+          printf "tag=%s\n" "$(docker buildx bake ${{ matrix.targets }} --print | jq -r '[.target[].tags[]][0]')" >> "$GITHUB_OUTPUT"
+
+      - name: Analyze for critical and high CVEs
+        id: docker-scout-cves
+        if: ${{ github.event_name != 'pull_request_target' && github.actor != 'nektos/act' }}
+        # kics-scan ignore-line
+        uses: docker/scout-action@v0.23.4
+        with:
+          command: cves
+          image: ${{ steps.meta.outputs.tag }}
+          sarif-file: sarif.output.json
+          summary: true
+
+      - name: Upload SARIF result
+        id: upload-sarif
+        if: ${{ github.event_name != 'pull_request_target' && github.actor != 'nektos/act' }}
+        # kics-scan ignore-line
+        uses: github/codeql-action/upload-sarif@v2
+        with:
+          sarif_file: sarif.output.json
 
       # # vulnerability scanning to verify PRs
       # - name: Docker Scout
