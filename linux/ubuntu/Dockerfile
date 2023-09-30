@@ -318,7 +318,7 @@ ENV PATH=/usr/local/go/bin:${PATH}
 RUN sed "s|^PATH=|PATH=/usr/local/go/bin:|mg" -i /etc/environment
 
 # add pulumi
-COPY --from=pulumi /root/.pulumi/bin/* /usr/local/bin/
+COPY --from=pulumi /root/.pulumi/bin /usr/local/bin/
 
 # add bicep
 COPY --from=bicep /usr/local/bin/bicep /usr/local/bin/bicep
