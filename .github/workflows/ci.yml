@@ -140,7 +140,7 @@ jobs:
           command: cves
           image: ${{ steps.meta.outputs.tag }}
           sarif-file: sarif.output.json
-          summary: true
+          summary: false
 
       - name: Upload SARIF result
         id: upload-sarif
