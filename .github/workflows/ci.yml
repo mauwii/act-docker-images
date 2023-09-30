@@ -15,8 +15,6 @@ on:
 
 permissions:
   contents: read
-  packages: write
-  pull-requests: write
 
 env:
   REGISTRY: ${{ (vars.DOCKERHUB_USERNAME != '' && secrets.DOCKERHUB_TOKEN != '') && 'docker.io' || 'ghcr.io' }}
@@ -70,6 +68,11 @@ jobs:
   build:
     needs: test
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      pull-requests: write
+      security-events: write
     strategy:
       matrix:
         targets: ${{ fromJson(needs.test.outputs.targets) }}
