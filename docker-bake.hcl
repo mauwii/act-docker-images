@@ -19,14 +19,14 @@ variable "GITHUB_SHA" {
 }
 
 variable "REF_NAME" {
-  default = and(notequal(GITHUB_BASE_REF, null), notequal(GITHUB_BASE_REF, "")) ? "${GITHUB_BASE_REF}" : and(notequal(GITHUB_REF_NAME, null), notequal(GITHUB_REF_NAME, "")) ? "${GITHUB_REF_NAME}" : "local"
+  default = and(notequal(GITHUB_HEAD_REF, null), notequal(GITHUB_HEAD_REF, "")) ? "${GITHUB_HEAD_REF}" : and(notequal(GITHUB_REF_NAME, null), notequal(GITHUB_REF_NAME, "")) ? "${GITHUB_REF_NAME}" : "local"
 }
 
 variable "GITHUB_REF_NAME" {
   default = null
 }
 
-variable "GITHUB_BASE_REF" {
+variable "GITHUB_HEAD_REF" {
   default = null
 }
 
@@ -128,10 +128,10 @@ target "ubuntu" {
     "${REGISTRY}/${GITHUB_REPOSITORY_OWNER}/ubuntu-act:cache-${release.codename}"
   ]
   cache-to = [
-    notequal(REF_NAME, "local") ? "${REGISTRY}/${GITHUB_REPOSITORY_OWNER}/ubuntu-act:cache-${release.codename}" : ""
+    and(notequal("nektos/act", GITHUB_ACTOR), notequal(REF_NAME, "local")) ? "${REGISTRY}/${GITHUB_REPOSITORY_OWNER}/ubuntu-act:cache-${release.codename}" : ""
   ]
   tags = [
-    "${REGISTRY}/${GITHUB_REPOSITORY_OWNER}/ubuntu-act:${release.major}.${release.minor}-${REF_NAME}",
+    "${REGISTRY}/${GITHUB_REPOSITORY_OWNER}/ubuntu-act:${release.major}.${release.minor}-${replace(REF_NAME,"/","-")}",
     and(notequal(GITHUB_SHA, null), equal("${REF_NAME}", "main")) ? "${REGISTRY}/${GITHUB_REPOSITORY_OWNER}/ubuntu-act:${release.major}.${release.minor}-${substr(GITHUB_SHA, 0, 7)}" : "",
     equal("${REF_NAME}", "main") ? "${REGISTRY}/${GITHUB_REPOSITORY_OWNER}/ubuntu-act:${release.major}.${release.minor}" : "",
     and(equal("${REF_NAME}", "main"), equal(release.codename, "jammy")) ? "${REGISTRY}/${GITHUB_REPOSITORY_OWNER}/ubuntu-act:latest" : "",
