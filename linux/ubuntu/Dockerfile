@@ -6,16 +6,6 @@ ARG FROM_VERSION_MINOR=04
 ARG FROM_VERSION=${FROM_VERSION_MAJOR}.${FROM_VERSION_MINOR}
 FROM ${FROM_IMAGE}:${FROM_VERSION} as base
 
-FROM base as bicep
-ARG TARGETARCH
-ARG BICEP_VERSION=v0.21.1
-RUN export targetarch="${TARGETARCH}" \
-    && if [ "${targetarch}" = "amd64" ]; then export targetarch="x64"; fi \
-    && curl -sSLo bicep "https://github.com/Azure/bicep/releases/download/${BICEP_VERSION}/bicep-linux-${targetarch}" \
-    && chmod +x ./bicep \
-    && mv ./bicep /usr/local/bin/bicep \
-    && bicep --version
-
 FROM base as golang
 ARG TARGETARCH
 SHELL [ "/bin/bash", "--login", "-e", "-o", "pipefail", "-c" ]
@@ -41,6 +31,16 @@ RUN curl -fsSL https://get.pulumi.com \
     | sh -s -- --version "${PULUMI_VERSION}" \
     && export PATH="$HOME/.pulumi/bin:$PATH" \
     && pulumi version
+
+FROM base as bicep
+ARG TARGETARCH
+ARG BICEP_VERSION=v0.21.1
+RUN export targetarch="${TARGETARCH}" \
+    && if [ "${targetarch}" = "amd64" ]; then export targetarch="x64"; fi \
+    && curl -sSLo bicep "https://github.com/Azure/bicep/releases/download/${BICEP_VERSION}/bicep-linux-${targetarch}" \
+    && chmod +x ./bicep \
+    && mv ./bicep /usr/local/bin/bicep \
+    && bicep --version
 
 FROM base as act-base
 
@@ -304,14 +304,6 @@ ARG TARGETARCH
 SHELL [ "/bin/bash", "--login", "-e", "-o", "pipefail", "-c" ]
 WORKDIR /tmp
 
-# add PowerShell
-ARG TOOL_PATH_PWSH=/usr/share/powershell
-COPY --from=powershell ${TOOL_PATH_PWSH} ${TOOL_PATH_PWSH}
-RUN ln -s "${TOOL_PATH_PWSH}/pwsh" /usr/local/bin/pwsh
-
-# add  PowerShell-modules
-COPY --from=powershell-modules /usr/local/share/powershell /usr/local/share/powershell
-
 # add go
 COPY --from=golang /usr/local/go /usr/local/go
 ENV PATH=/usr/local/go/bin:${PATH}
@@ -322,6 +314,14 @@ COPY --from=pulumi /root/.pulumi/bin /usr/local/bin/
 
 # add bicep
 COPY --from=bicep /usr/local/bin/bicep /usr/local/bin/bicep
+
+# add PowerShell
+ARG TOOL_PATH_PWSH=/usr/share/powershell
+COPY --from=powershell ${TOOL_PATH_PWSH} ${TOOL_PATH_PWSH}
+RUN ln -s "${TOOL_PATH_PWSH}/pwsh" /usr/local/bin/pwsh
+
+# add  PowerShell-modules
+COPY --from=powershell-modules /usr/local/share/powershell /usr/local/share/powershell
 
 ARG RUNNER
 USER ${RUNNER}
