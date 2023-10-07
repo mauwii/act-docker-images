@@ -125,8 +125,7 @@ jobs:
         id: meta
         run: |
           {
-            arch="${{ runner.arch }}"
-            printf "arch=linux/%s\n" "${arch,,}";
+            printf "arch=linux/%s\n" "$(docker run --rm --quiet ubuntu:22.04 dpkg --print-architecture)";
             printf "tag=%s\n" "$(docker buildx bake ${{ matrix.targets }} --print | jq -r '.target[].tags[0]')";
             printf "main_tag=%s\n" "$(REF_NAME=main docker buildx bake ${{ matrix.targets }} --print | jq -r '.target[].tags[0]')";
           } | tee "${GITHUB_OUTPUT}"
