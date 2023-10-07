@@ -5,6 +5,7 @@ name: ci
 
 on:
   push:
+    branches: [main]
     paths:
       - '**/Dockerfile'
       - '**/.github/workflows/ci.yml'
@@ -67,6 +68,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       targets: ${{ steps.targets.outputs.matrix }}
+      platforms: ${{ steps.platforms.outputs.matrix }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4.1.0
@@ -74,10 +76,20 @@ jobs:
       - name: Generate targets matrix
         id: targets
         run: |
-          printf "matrix={\"targets\":%s}\n" "$(docker buildx bake --print | jq -r '"\(.target | keys)"')" >>"${GITHUB_OUTPUT}"
+          printf "matrix=%s\n" "$(docker buildx bake --print | jq -r '"\(.target | keys)"')" >>"${GITHUB_OUTPUT}"
+          # printf "matrix={\"targets\":%s}\n" "$(docker buildx bake --print | jq -r '"\(.target | keys)"')" >>"${GITHUB_OUTPUT}"
 
       - name: Show targets matrix
         run: "echo '${{ steps.targets.outputs.matrix }}' | jq"
+
+      - name: Generate platforms matrix
+        id: platforms
+        run: |
+          printf "matrix=%s\n" "$(docker buildx bake --print | jq -cr '[.target[].platforms[]]|unique')" >>"${GITHUB_OUTPUT}"
+          # printf "matrix=[{\"targets\":%s},{\"platforms\":%s}]\n" "$(docker buildx bake --print | jq -r '"\(.target | keys)"')" "$(docker buildx bake --print | jq -cr '[.target[].platforms[]]|unique')" >>"${GITHUB_OUTPUT}"
+
+      - name: Show platforms matrix
+        run: "echo '${{ steps.platforms.outputs.matrix }}' | jq"
 
   build:
     needs: [generate-jobs]
@@ -88,24 +100,42 @@ jobs:
       pull-requests: write
       security-events: write
     strategy:
-      matrix: ${{ fromJson(needs.generate-jobs.outputs.targets) }}
+      matrix:
+        targets: ${{ fromJson(needs.generate-jobs.outputs.targets) }}
+        platforms: ${{ github.event_name == 'pull_request' && fromJson(needs.generate-jobs.outputs.platforms) || '[]' }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4.1.0
 
+      - name: Get meta data
+        id: meta
+        run: |
+          {
+            printf "arch=%s\n" "${arch/\//-}";
+            printf "tag=%s\n" "$(docker buildx bake ${{ matrix.targets }} --print | jq -r '.target[].tags[0]')";
+            printf "main_tag=%s\n" "$(REF_NAME=main docker buildx bake ${{ matrix.targets }} --print | jq -r '.target[].tags[0]')";
+          } >> "$GITHUB_OUTPUT"
+          # printf "arch=%s\n" "${arch/\//-}" >> "$GITHUB_OUTPUT"
+          # printf "tag=%s\n" "$(docker buildx bake ${{ matrix.targets }} --print | jq -r '.target[].tags[0]')" >> "$GITHUB_OUTPUT"
+          # printf "main_tag=%s\n" "$(REF_NAME=main docker buildx bake ${{ matrix.targets }} --print | jq -r '.target[].tags[0]')" >> "$GITHUB_OUTPUT"
+        env:
+          arch: ${{ matrix.platforms }}
+
       - name: Setup QEMU
         # kics-scan ignore-line
         uses: docker/setup-qemu-action@v3.0.0
-        # with:
+        with:
+          platforms: ${{ steps.meta.outputs.arch }}
         #   image: 'tonistiigi/binfmt:buildkit-latest'
 
       - name: Setup Docker Buildx
         # kics-scan ignore-line
         uses: docker/setup-buildx-action@v3.0.0
-        # with:
-        #   driver-opts: |
-        #     image=moby/buildkit:latest
-        #   # driver: ${{ github.event_name == 'pull_request' && 'docker' || 'docker-container' }}
+        with:
+          driver: ${{ github.event_name == 'pull_request' && 'docker' || 'docker-container' }}
+          driver-opts: |
+            ${{ github.event_name == 'pull_request' && 'network=host' || '' }}
+          #   image=moby/buildkit:latest
 
       # Login against a container registry
       # https://github.com/docker/login-action
@@ -134,21 +164,21 @@ jobs:
         with:
           files: docker-bake.hcl
           targets: ${{ matrix.targets }}
-          sbom: true
-          provenance: true
+          sbom: ${{ github.event_name != 'pull_request' }}
+          provenance: ${{ github.event_name != 'pull_request' }}
+          set: |
+            ${{ github.event_name == 'pull_request' && format('*.platform={0}', matrix.platforms) || '' }}
+            ${{ github.event_name == 'pull_request' && format('*.tags={0}-{1}', steps.meta.outputs.tag, steps.meta.outputs.arch) || '' }}
+            ${{ github.event_name == 'pull_request' && '*.cache-to=' || '' }}
           push: ${{ github.event_name != 'pull_request' && github.actor != 'nektos/act' }}
+          load: ${{ github.event_name == 'pull_request' }}
 
       # vulnerability scanning
-      - name: Get the image tag
-        id: meta
-        run: |
-          printf "tag=%s\n" "$(docker buildx bake ${{ matrix.targets }} --print | jq -r '.target[].tags[0]')" >> "$GITHUB_OUTPUT"
-          printf "main_tag=%s\n" "$(REF_NAME=main docker buildx bake ${{ matrix.targets }} --print | jq -r '.target[].tags[0]')" >> "$GITHUB_OUTPUT"
-      - name: Analyze for critical and high CVEs
+      # kics-scan ignore-line
+      - uses: docker/scout-action@v1.0.8
+        name: Analyze for critical and high CVEs
         id: docker-scout-cves
         if: ${{ github.event_name != 'pull_request' && github.actor != 'nektos/act' }}
-        # kics-scan ignore-line
-        uses: docker/scout-action@v1.0.8
         with:
           command: cves
           image: ${{ steps.meta.outputs.tag }}
@@ -170,14 +200,14 @@ jobs:
         if: ${{ github.event_name == 'pull_request' && steps.meta.outputs.tag != steps.meta.outputs.main_tag }}
         with:
           platform: ${{ matrix.platforms }}
-          command: quickview,compare
-          image: ${{ steps.meta.outputs.tag }}
+          command: compare
+          image: ${{ format('{0}-{1}', steps.meta.outputs.tag, steps.meta.outputs.arch) }}
           to: ${{ steps.meta.outputs.main_tag }}
           ignore-unchanged: true
+          only-severities: critical,high
           write-comment: ${{ github.actor != 'nektos/act' }}
           summary: ${{ github.actor != 'nektos/act' }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          organization: ${{ vars.DOCKERHUB_USERNAME || github.repository_owner }}
 
   approve-pr:
     name: Approve PR
