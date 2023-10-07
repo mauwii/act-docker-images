@@ -28,7 +28,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        # kics-scan ignore-line
         uses: actions/checkout@v4.1.0
 
       - name: Setup Docker Buildx
@@ -38,18 +37,18 @@ jobs:
       # get docker binary path to use it with env -i
       - name: Get the docker binary path
         id: docker-binary-path
-        run: echo "DOCKER_BINARY_PATH=$(which docker)" >> "$GITHUB_OUTPUT"
+        run: echo "docker-bin=$(which docker)" | tee "${GITHUB_OUTPUT}"
 
       - name: Print the bake file with a empty env
         id: bake-file-no-env
-        run: env -i ${{ steps.docker-binary-path.outputs.DOCKER_BINARY_PATH }} buildx bake --print
+        run: env -i ${{ steps.docker-binary-path.outputs.docker-bin }} buildx bake --print
 
       - name: Verify the tags end on -local
         run: |
           while IFS='' read -r container_tag; do
               printf "Container tag: %s\n" "${container_tag}"
               [[ "${container_tag}" == *"-local" ]] || exit 1
-          done < <(env -i ${{ steps.docker-binary-path.outputs.DOCKER_BINARY_PATH }} buildx bake --print  | jq -r '.target[].tags[0]')
+          done < <(env -i ${{ steps.docker-binary-path.outputs.docker-bin }} buildx bake --print  | jq -r '.target[].tags[0]')
 
       - name: Print the bake file with the runner env
         run: docker buildx bake --print
@@ -76,20 +75,12 @@ jobs:
       - name: Generate targets matrix
         id: targets
         run: |
-          printf "matrix=%s\n" "$(docker buildx bake --print | jq -r '"\(.target | keys)"')" >>"${GITHUB_OUTPUT}"
-          # printf "matrix={\"targets\":%s}\n" "$(docker buildx bake --print | jq -r '"\(.target | keys)"')" >>"${GITHUB_OUTPUT}"
-
-      - name: Show targets matrix
-        run: "echo '${{ steps.targets.outputs.matrix }}' | jq"
+          printf "matrix=%s\n" "$(docker buildx bake --print | jq -r '"\(.target | keys)"')" | tee "${GITHUB_OUTPUT}"
 
       - name: Generate platforms matrix
         id: platforms
         run: |
-          printf "matrix=%s\n" "$(docker buildx bake --print | jq -cr '[.target[].platforms[]]|unique')" >>"${GITHUB_OUTPUT}"
-          # printf "matrix=[{\"targets\":%s},{\"platforms\":%s}]\n" "$(docker buildx bake --print | jq -r '"\(.target | keys)"')" "$(docker buildx bake --print | jq -cr '[.target[].platforms[]]|unique')" >>"${GITHUB_OUTPUT}"
-
-      - name: Show platforms matrix
-        run: "echo '${{ steps.platforms.outputs.matrix }}' | jq"
+          printf "matrix=%s\n" "$(docker buildx bake --print | jq -cr '[.target[].platforms[]]|unique')" | tee "${GITHUB_OUTPUT}"
 
   build:
     needs: [generate-jobs]
@@ -114,10 +105,7 @@ jobs:
             printf "arch=%s\n" "${arch/\//-}";
             printf "tag=%s\n" "$(docker buildx bake ${{ matrix.targets }} --print | jq -r '.target[].tags[0]')";
             printf "main_tag=%s\n" "$(REF_NAME=main docker buildx bake ${{ matrix.targets }} --print | jq -r '.target[].tags[0]')";
-          } >> "$GITHUB_OUTPUT"
-          # printf "arch=%s\n" "${arch/\//-}" >> "$GITHUB_OUTPUT"
-          # printf "tag=%s\n" "$(docker buildx bake ${{ matrix.targets }} --print | jq -r '.target[].tags[0]')" >> "$GITHUB_OUTPUT"
-          # printf "main_tag=%s\n" "$(REF_NAME=main docker buildx bake ${{ matrix.targets }} --print | jq -r '.target[].tags[0]')" >> "$GITHUB_OUTPUT"
+          } | tee "${GITHUB_OUTPUT}"
         env:
           arch: ${{ matrix.platforms }}
 
@@ -126,7 +114,6 @@ jobs:
         uses: docker/setup-qemu-action@v3.0.0
         with:
           platforms: ${{ steps.meta.outputs.arch }}
-        #   image: 'tonistiigi/binfmt:buildkit-latest'
 
       - name: Setup Docker Buildx
         # kics-scan ignore-line
