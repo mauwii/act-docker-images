@@ -53,11 +53,11 @@ jobs:
       - name: Print the bake file with the runner env
         run: docker buildx bake --print
 
-      - name: Verify the tags end on -${{ github.head_ref || github.ref_name }}
+      - name: Verify the tags are valid
         run: |
           while IFS='' read -r container_tag; do
               printf "Container tag: %s\n" "${container_tag}"
-              [[ "${container_tag}" == *"-${REF}" ]] || exit 1
+              [[ "${container_tag}" == *"-${REF//\//-}" ]] || exit 1
           done < <(docker buildx bake --print | jq -r '.target[].tags[0]')
         env:
           REF: ${{ github.head_ref || github.ref_name}}
