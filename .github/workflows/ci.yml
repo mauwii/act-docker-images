@@ -98,31 +98,17 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4.1.0
 
-      - name: Get meta data
-        id: meta
-        run: |
-          {
-            printf "arch=%s\n" "${arch/\//-}";
-            printf "tag=%s\n" "$(docker buildx bake ${{ matrix.targets }} --print | jq -r '.target[].tags[0]')";
-            printf "main_tag=%s\n" "$(REF_NAME=main docker buildx bake ${{ matrix.targets }} --print | jq -r '.target[].tags[0]')";
-          } | tee "${GITHUB_OUTPUT}"
-        env:
-          arch: ${{ matrix.platforms }}
-
       - name: Setup QEMU
         # kics-scan ignore-line
         uses: docker/setup-qemu-action@v3.0.0
         with:
-          platforms: ${{ steps.meta.outputs.arch }}
+          platforms: ${{ matrix.platforms }}
 
       - name: Setup Docker Buildx
         # kics-scan ignore-line
         uses: docker/setup-buildx-action@v3.0.0
         with:
           driver: ${{ github.event_name == 'pull_request' && 'docker' || 'docker-container' }}
-          driver-opts: |
-            ${{ github.event_name == 'pull_request' && 'network=host' || '' }}
-          #   image=moby/buildkit:latest
 
       # Login against a container registry
       # https://github.com/docker/login-action
@@ -143,6 +129,17 @@ jobs:
           deleteDotnet: 'true'
           deleteAndroid: 'true'
 
+      - name: Get meta data
+        id: meta
+        run: |
+          {
+            printf "arch=%s\n" "${arch/\//-}";
+            printf "tag=%s\n" "$(docker buildx bake ${{ matrix.targets }} --print | jq -r '.target[].tags[0]')";
+            printf "main_tag=%s\n" "$(REF_NAME=main docker buildx bake ${{ matrix.targets }} --print | jq -r '.target[].tags[0]')";
+          } | tee "${GITHUB_OUTPUT}"
+        env:
+          arch: ${{ matrix.platforms }}
+
       # Bake the image
       # kics-scan ignore-line
       - uses: docker/bake-action@v4.0.0
@@ -160,7 +157,7 @@ jobs:
           push: ${{ github.event_name != 'pull_request' && github.actor != 'nektos/act' }}
           load: ${{ github.event_name == 'pull_request' }}
 
-      # vulnerability scanning
+      # vulnerability scan the image
       # kics-scan ignore-line
       - uses: docker/scout-action@v1.0.8
         name: Analyze for critical and high CVEs
@@ -171,6 +168,7 @@ jobs:
           image: ${{ steps.meta.outputs.tag }}
           sarif-file: sarif.output.json
           summary: false
+      # upload the results as a SARIF file to gh security tab
       - name: Upload SARIF result
         id: upload-sarif
         if: ${{ github.event_name != 'pull_request' && github.actor != 'nektos/act' }}
@@ -181,20 +179,22 @@ jobs:
 
       # vulnerability scanning to verify PRs
       # kics-scan ignore-line
-      - uses: docker/scout-action@v1.0.8
-        name: Docker Scout PR Quickview
+      - uses: docker/scout-action@64ca6fb5e6ada64f5febd1a991b499900b29faf0
+        name: Docker Scout compare
         id: pr-quickview
-        if: ${{ github.event_name == 'pull_request' && steps.meta.outputs.tag != steps.meta.outputs.main_tag }}
+        if: ${{ github.event_name == 'pull_request' && steps.meta.outputs.tag != steps.meta.outputs.main_tag && vars.DOCKERHUB_USERNAME != '' }}
         with:
           platform: ${{ matrix.platforms }}
           command: compare
           image: ${{ format('{0}-{1}', steps.meta.outputs.tag, steps.meta.outputs.arch) }}
           to: ${{ steps.meta.outputs.main_tag }}
           ignore-unchanged: true
-          only-severities: critical,high
+          only-fixed: true
+          only-severities: critical
           write-comment: ${{ github.actor != 'nektos/act' }}
           summary: ${{ github.actor != 'nektos/act' }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
+          organization: ${{ vars.DOCKERHUB_USERNAME }}
 
   approve-pr:
     name: Approve PR
