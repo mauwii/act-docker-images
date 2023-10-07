@@ -131,7 +131,7 @@ target "ubuntu" {
     and(notequal("nektos/act", GITHUB_ACTOR), notequal(REF_NAME, "local")) ? "${REGISTRY}/${GITHUB_REPOSITORY_OWNER}/ubuntu-act:cache-${release.codename}" : ""
   ]
   tags = [
-    "${REGISTRY}/${GITHUB_REPOSITORY_OWNER}/ubuntu-act:${release.major}.${release.minor}-${replace(REF_NAME,"/","-")}",
+    "${REGISTRY}/${GITHUB_REPOSITORY_OWNER}/ubuntu-act:${release.major}.${release.minor}-${replace(REF_NAME, "/", "-")}",
     and(notequal(GITHUB_SHA, null), equal("${REF_NAME}", "main")) ? "${REGISTRY}/${GITHUB_REPOSITORY_OWNER}/ubuntu-act:${release.major}.${release.minor}-${substr(GITHUB_SHA, 0, 7)}" : "",
     equal("${REF_NAME}", "main") ? "${REGISTRY}/${GITHUB_REPOSITORY_OWNER}/ubuntu-act:${release.major}.${release.minor}" : "",
     and(equal("${REF_NAME}", "main"), equal(release.codename, "jammy")) ? "${REGISTRY}/${GITHUB_REPOSITORY_OWNER}/ubuntu-act:latest" : "",
