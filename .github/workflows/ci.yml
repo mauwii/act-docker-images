@@ -5,6 +5,7 @@ name: ci
 
 on:
   push:
+    branches: [main]
     paths:
       - '**/Dockerfile'
       - '**/.github/workflows/ci.yml'
@@ -25,11 +26,8 @@ env:
 jobs:
   test:
     runs-on: ubuntu-latest
-    outputs:
-      targets: ${{ steps.matrix.outputs.targets }}
     steps:
       - name: Checkout code
-        # kics-scan ignore-line
         uses: actions/checkout@v4.1.0
 
       - name: Setup Docker Buildx
@@ -39,34 +37,48 @@ jobs:
       # get docker binary path to use it with env -i
       - name: Get the docker binary path
         id: docker-binary-path
-        run: echo "DOCKER_BINARY_PATH=$(which docker)" >> "$GITHUB_OUTPUT"
+        run: echo "docker-bin=$(which docker)" | tee "${GITHUB_OUTPUT}"
 
       - name: Print the bake file with a empty env
         id: bake-file-no-env
-        run: env -i ${{ steps.docker-binary-path.outputs.DOCKER_BINARY_PATH }} buildx bake --print
+        run: env -i ${{ steps.docker-binary-path.outputs.docker-bin }} buildx bake --print
 
-      - name: Verify the tag ends on -local
+      - name: Verify the tags end on -local
         run: |
-          BAKE_TAG="$(env -i ${{ steps.docker-binary-path.outputs.DOCKER_BINARY_PATH }} buildx bake --print  | jq -r '[.target[].tags[]][0]')"
-          [[ "${BAKE_TAG}" == *"-local" ]] || exit 1
+          while IFS='' read -r container_tag; do
+              printf "Container tag: %s\n" "${container_tag}"
+              [[ "${container_tag}" == *"-local" ]] || exit 1
+          done < <(env -i ${{ steps.docker-binary-path.outputs.docker-bin }} buildx bake --print  | jq -r '.target[].tags[0]')
 
       - name: Print the bake file with the runner env
         run: docker buildx bake --print
 
-      - name: Validate tag ends on -${{ github.base_ref || github.ref_name }}
+      - name: Verify the tags are valid
         run: |
-          BAKE_TAG="$(docker buildx bake --print | jq -r '[.target[].tags[]][0]')"
-          [[ "${BAKE_TAG}" == *"-${{ github.base_ref || github.ref_name}}" ]] || exit 1
+          while IFS='' read -r container_tag; do
+              printf "Container tag: %s\n" "${container_tag}"
+              [[ "${container_tag}" == *"-${REF//\//-}" ]] || exit 1
+          done < <(docker buildx bake --print | jq -r '.target[].tags[0]')
+        env:
+          REF: ${{ github.head_ref || github.ref_name}}
 
-      - name: Create matrix
-        id: matrix
-        run: printf "targets=%s\n" "$(docker buildx bake --print | jq -r '"\(.target | keys)"')" >>"${GITHUB_OUTPUT}"
+  generate-jobs:
+    needs: [test]
+    runs-on: ubuntu-latest
+    outputs:
+      targets: ${{ steps.targets.outputs.matrix }}
+      # platforms: ${{ steps.platforms.outputs.matrix }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4.1.0
 
-      - name: Show matrix
-        run: "echo '${{ steps.matrix.outputs.targets }}' | jq"
+      - name: Generate targets matrix
+        id: targets
+        run: |
+          printf "matrix=%s\n" "$(docker buildx bake --print | jq -r '"\(.target | keys)"')" | tee "${GITHUB_OUTPUT}"
 
   build:
-    needs: test
+    needs: [generate-jobs]
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -75,25 +87,20 @@ jobs:
       security-events: write
     strategy:
       matrix:
-        targets: ${{ fromJson(needs.test.outputs.targets) }}
+        targets: ${{ fromJson(needs.generate-jobs.outputs.targets) }}
     steps:
       - name: Checkout code
-        # kics-scan ignore-line
         uses: actions/checkout@v4.1.0
 
       - name: Setup QEMU
         # kics-scan ignore-line
         uses: docker/setup-qemu-action@v3.0.0
-        # with:
-        #   image: 'tonistiigi/binfmt:buildkit-latest'
 
       - name: Setup Docker Buildx
         # kics-scan ignore-line
         uses: docker/setup-buildx-action@v3.0.0
-        # with:
-        #   driver-opts: |
-        #     image=moby/buildkit:latest
-        #   # driver: ${{ github.event_name == 'pull_request' && 'docker' || 'docker-container' }}
+        with:
+          driver: ${{ github.event_name == 'pull_request' && 'docker' || 'docker-container' }}
 
       # Login against a container registry
       # https://github.com/docker/login-action
@@ -114,6 +121,15 @@ jobs:
           deleteDotnet: 'true'
           deleteAndroid: 'true'
 
+      - name: Get meta data
+        id: meta
+        run: |
+          {
+            printf "arch=linux/%s\n" "$(docker run --rm --quiet ubuntu:22.04 dpkg --print-architecture)";
+            printf "tag=%s\n" "$(docker buildx bake ${{ matrix.targets }} --print | jq -r '.target[].tags[0]')";
+            printf "main_tag=%s\n" "$(REF_NAME=main docker buildx bake ${{ matrix.targets }} --print | jq -r '.target[].tags[0]')";
+          } | tee "${GITHUB_OUTPUT}"
+
       # Bake the image
       # kics-scan ignore-line
       - uses: docker/bake-action@v4.0.0
@@ -122,51 +138,51 @@ jobs:
         with:
           files: docker-bake.hcl
           targets: ${{ matrix.targets }}
-          sbom: true
-          provenance: true
+          sbom: ${{ github.event_name != 'pull_request' }}
+          provenance: ${{ github.event_name != 'pull_request' }}
+          set: |
+            ${{ github.event_name == 'pull_request' && '*.cache-to=' || '' }}
+            ${{ github.event_name == 'pull_request' && format('*.platform={0}', steps.meta.outputs.arch) || '' }}
           push: ${{ github.event_name != 'pull_request' && github.actor != 'nektos/act' }}
+          load: ${{ github.event_name == 'pull_request' }}
 
-      - name: Get the image tag
-        id: meta
-        run: |
-          printf "tag=%s\n" "$(docker buildx bake ${{ matrix.targets }} --print | jq -r '[.target[].tags[]][0]')" >> "$GITHUB_OUTPUT"
-
-      - name: Analyze for critical and high CVEs
+      # vulnerability scan the image
+      # kics-scan ignore-line
+      - uses: docker/scout-action@v1.0.8
+        name: Analyze for critical and high CVEs
         id: docker-scout-cves
         if: ${{ github.event_name != 'pull_request' && github.actor != 'nektos/act' }}
-        # kics-scan ignore-line
-        uses: docker/scout-action@v1.0.8
         with:
           command: cves
           image: ${{ steps.meta.outputs.tag }}
           sarif-file: sarif.output.json
           summary: false
-
-      - name: Upload SARIF result
+      # upload the results as a SARIF file to gh security tab
+      # kics-scan ignore-line
+      - uses: github/codeql-action/upload-sarif@v2.22.0
+        name: Upload SARIF result
         id: upload-sarif
         if: ${{ github.event_name != 'pull_request' && github.actor != 'nektos/act' }}
-        # kics-scan ignore-line
-        uses: github/codeql-action/upload-sarif@v2
         with:
           sarif_file: sarif.output.json
 
-      # # vulnerability scanning to verify PRs
-      # - name: Docker Scout
-      #   id: docker-scout
-      #   uses: docker/scout-action@v1.0.8
-      #   if: github.event_name == 'pull_request'
-      #   with:
-      #     platform: ${{ matrix.platforms }}
-      #     command: quickview
-      #     image: ${{ env.FROM_IMAGE_PATH }}
-      #     type: archive
-      #     to: ${{ env.TO_TAG }}
-      #     ignore-unchanged: true
-      #     only-severities: critical
-      #     write-comment: ${{ github.actor != 'nektos/act' }}
-      #     summary: ${{ github.actor != 'nektos/act' }}
-      #     github-token: ${{ secrets.GITHUB_TOKEN }}
-      #     organization: ${{ vars.DOCKERHUB_USERNAME || github.repository_owner }}
+      # vulnerability scanning to verify PRs
+      # kics-scan ignore-line
+      - uses: docker/scout-action@64ca6fb5e6ada64f5febd1a991b499900b29faf0
+        name: Docker Scout compare
+        id: pr-quickview
+        if: ${{ github.event_name == 'pull_request' && steps.meta.outputs.tag != steps.meta.outputs.main_tag && vars.DOCKERHUB_USERNAME != '' }}
+        with:
+          command: compare
+          platform: ${{ steps.meta.outputs.arch }}
+          image: ${{ steps.meta.outputs.tag }}
+          to: ${{ steps.meta.outputs.main_tag }}
+          ignore-unchanged: true
+          only-fixed: true
+          only-severities: critical,high
+          write-comment: ${{ github.actor != 'nektos/act' }}
+          summary: ${{ github.actor != 'nektos/act' }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
 
   approve-pr:
     name: Approve PR

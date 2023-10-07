@@ -1,14 +1,16 @@
 ---
 # yaml-language-server: $schema=https://raw.githubusercontent.com/oxsecurity/megalinter/main/megalinter/descriptors/schemas/megalinter-configuration.jsonschema.json
+
 # Configuration file for MegaLinter
 # See all available variables at https://megalinter.io/latest/config-file/ and in linters documentation
+
 APPLY_FIXES: 'all' # all, none, or list of linter keys
 CLEAR_REPORT_FOLDER: true
 DISABLE_LINTERS:
   - REPOSITORY_SEMGREP # doesn't work for me currently
 FILEIO_REPORTER: false
-# FILTER_REGEX_EXCLUDE: '(megalinter-reports)'
 IGNORE_GITIGNORED_FILES: true
 SHOW_ELAPSED_TIME: true
 SPELL_LYCHEE_FILTER_REGEX_EXCLUDE: '(\.github/workflows|\.mega-linter\.yml)'
 YAML_V8R_FILTER_REGEX_EXCLUDE: '(\.prettierrc\.yaml)'
+VALIDATE_ALL_CODEBASE: true

@@ -41,8 +41,8 @@ The easiest way is to add those lines in your `~/.actrc`:
 -P ubuntu-20.04=mauwii/ubuntu-act:20.04
 ```
 
-For further information about [nektos/act][nektosActRepo] and how to use it, take a 👀 at the [nektos
-documentation📖][nektosDocs]
+For further information about [nektos/act][nektosActRepo] and how to use it, take a 👀 at the
+[nektos documentation📖][nektosDocs]
 
 ## How I run act on my M2-Max 💻
 
@@ -111,9 +111,12 @@ documentation📖][nektosDocs]
 ## docker-bake file
 
 As always, there are different options to build the images locally. I added `docker-bake.hcl` which
-helps with orchestrating builds and needs buildx to be available, which comes out of the box with
-docker desktop. Bake Files are still considered experimental, and your results may be totally
-different depending on your local docker configuration.
+helps with orchestrating builds but needs buildx to be available on the host (it comes out of the
+box with docker desktop).
+
+> [!WARNING]  
+> Bake Files are still considered experimental, and your results may be totally different depending
+> on your local docker configuration.
 
 - using the `local` tag:
 
