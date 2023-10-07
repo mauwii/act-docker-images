@@ -67,7 +67,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       targets: ${{ steps.targets.outputs.matrix }}
-      platforms: ${{ steps.platforms.outputs.matrix }}
+      # platforms: ${{ steps.platforms.outputs.matrix }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4.1.0
@@ -76,11 +76,6 @@ jobs:
         id: targets
         run: |
           printf "matrix=%s\n" "$(docker buildx bake --print | jq -r '"\(.target | keys)"')" | tee "${GITHUB_OUTPUT}"
-
-      - name: Generate platforms matrix
-        id: platforms
-        run: |
-          printf "matrix=%s\n" "$(docker buildx bake --print | jq -cr '[.target[].platforms[]]|unique')" | tee "${GITHUB_OUTPUT}"
 
   build:
     needs: [generate-jobs]
@@ -93,7 +88,6 @@ jobs:
     strategy:
       matrix:
         targets: ${{ fromJson(needs.generate-jobs.outputs.targets) }}
-        platforms: ${{ github.event_name == 'pull_request' && fromJson(needs.generate-jobs.outputs.platforms) || '[]' }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4.1.0
@@ -101,8 +95,6 @@ jobs:
       - name: Setup QEMU
         # kics-scan ignore-line
         uses: docker/setup-qemu-action@v3.0.0
-        with:
-          platforms: ${{ matrix.platforms }}
 
       - name: Setup Docker Buildx
         # kics-scan ignore-line
@@ -133,12 +125,11 @@ jobs:
         id: meta
         run: |
           {
-            printf "arch=%s\n" "${arch/\//-}";
+            arch="${{ runner.arch }}"
+            printf "arch=linux/%s\n" "${arch,,}";
             printf "tag=%s\n" "$(docker buildx bake ${{ matrix.targets }} --print | jq -r '.target[].tags[0]')";
             printf "main_tag=%s\n" "$(REF_NAME=main docker buildx bake ${{ matrix.targets }} --print | jq -r '.target[].tags[0]')";
           } | tee "${GITHUB_OUTPUT}"
-        env:
-          arch: ${{ matrix.platforms }}
 
       # Bake the image
       # kics-scan ignore-line
@@ -151,9 +142,8 @@ jobs:
           sbom: ${{ github.event_name != 'pull_request' }}
           provenance: ${{ github.event_name != 'pull_request' }}
           set: |
-            ${{ github.event_name == 'pull_request' && format('*.platform={0}', matrix.platforms) || '' }}
-            ${{ github.event_name == 'pull_request' && format('*.tags={0}-{1}', steps.meta.outputs.tag, steps.meta.outputs.arch) || '' }}
             ${{ github.event_name == 'pull_request' && '*.cache-to=' || '' }}
+            ${{ github.event_name == 'pull_request' && format('*.platform={0}', steps.meta.outputs.arch) || '' }}
           push: ${{ github.event_name != 'pull_request' && github.actor != 'nektos/act' }}
           load: ${{ github.event_name == 'pull_request' }}
 
@@ -169,11 +159,11 @@ jobs:
           sarif-file: sarif.output.json
           summary: false
       # upload the results as a SARIF file to gh security tab
-      - name: Upload SARIF result
+      # kics-scan ignore-line
+      - uses: github/codeql-action/upload-sarif@v2.22.0
+        name: Upload SARIF result
         id: upload-sarif
         if: ${{ github.event_name != 'pull_request' && github.actor != 'nektos/act' }}
-        # kics-scan ignore-line
-        uses: github/codeql-action/upload-sarif@v2.22.0
         with:
           sarif_file: sarif.output.json
 
@@ -184,17 +174,16 @@ jobs:
         id: pr-quickview
         if: ${{ github.event_name == 'pull_request' && steps.meta.outputs.tag != steps.meta.outputs.main_tag && vars.DOCKERHUB_USERNAME != '' }}
         with:
-          platform: ${{ matrix.platforms }}
           command: compare
-          image: ${{ format('{0}-{1}', steps.meta.outputs.tag, steps.meta.outputs.arch) }}
+          platform: ${{ steps.meta.outputs.arch }}
+          image: ${{ steps.meta.outputs.tag }}
           to: ${{ steps.meta.outputs.main_tag }}
           ignore-unchanged: true
           only-fixed: true
-          only-severities: critical
+          only-severities: critical,high
           write-comment: ${{ github.actor != 'nektos/act' }}
           summary: ${{ github.actor != 'nektos/act' }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          organization: ${{ vars.DOCKERHUB_USERNAME }}
 
   approve-pr:
     name: Approve PR
