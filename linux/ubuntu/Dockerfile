@@ -6,6 +6,25 @@ ARG FROM_VERSION_MINOR=04
 ARG FROM_VERSION=${FROM_VERSION_MAJOR}.${FROM_VERSION_MINOR}
 FROM ${FROM_IMAGE}:${FROM_VERSION} as base
 
+# Force apt to not be interactive/not ask
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Configure apt to always assume Y
+RUN echo "APT::Get::Assume-Yes \"true\";" >/etc/apt/apt.conf.d/90assumeyes
+
+# set locale
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        locales \
+    && rm -rf /var/lib/apt/lists/* \
+    && localedef -i en_US -c -f UTF-8 -A /usr/share/locale/locale.alias en_US.UTF-8
+
+ENV LANG=en_US.UTF-8 \
+    LANGUAGE=en_US:en \
+    LC_ALL=en_US.UTF-8 \
+    RUNNER_MANUALLY_TRAP_SIG=1 \
+    ACTIONS_RUNNER_PRINT_LOG_TO_STDOUT=1
+
 FROM base as golang
 ARG TARGETARCH
 SHELL [ "/bin/bash", "--login", "-e", "-o", "pipefail", "-c" ]
@@ -53,25 +72,6 @@ ARG FROM_VERSION_MAJOR=22
 ARG FROM_VERSION_MINOR=04
 ARG FROM_VERSION=${FROM_VERSION_MAJOR}.${FROM_VERSION_MINOR}
 ARG DISTRO=ubuntu
-
-# Force apt to not be interactive/not ask
-ENV DEBIAN_FRONTEND=noninteractive
-
-# Configure apt to always assume Y
-RUN echo "APT::Get::Assume-Yes \"true\";" >/etc/apt/apt.conf.d/90assumeyes
-
-# set locale
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends \
-        locales \
-    && rm -rf /var/lib/apt/lists/* \
-    && localedef -i en_US -c -f UTF-8 -A /usr/share/locale/locale.alias en_US.UTF-8
-
-ENV LANG=en_US.UTF-8 \
-    LANGUAGE=en_US:en \
-    LC_ALL=en_US.UTF-8 \
-    RUNNER_MANUALLY_TRAP_SIG=1 \
-    ACTIONS_RUNNER_PRINT_LOG_TO_STDOUT=1
 
 # enable pipefail and set workdir
 SHELL [ "/bin/bash", "--login", "-e", "-o", "pipefail", "-c" ]
@@ -154,7 +154,9 @@ RUN echo "deb https://packages.microsoft.com/ubuntu/$(lsb_release -rs)/prod $(ls
     && rm -rf /var/lib/apt/lists/*
 
 # Set .NET related environment variables
-ARG DOTNET_SDK_VERSION=6.0.414
+ARG DOTNET_SDK_VERSION=latest
+ARG DOTNET_CHANNEL=STS
+ARG DOTNET_DEPS
 ENV DOTNET_CLI_TELEMETRY_OPTOUT=1 \
     DOTNET_GENERATE_ASPNET_CERTIFICATE=false \
     DOTNET_HOST_PATH=${AGENT_TOOLSDIRECTORY}/dotnet/dotnet \
@@ -168,18 +170,17 @@ ENV DOTNET_CLI_TELEMETRY_OPTOUT=1 \
     NUGET_PACKAGES=${AGENT_TOOLSDIRECTORY}/nugetpackages \
     PATH=${AGENT_TOOLSDIRECTORY}/dotnet/tools:${AGENT_TOOLSDIRECTORY}/dotnet:${PATH}
 
-# install .NET SDK LTS
+# install .NET SDK
 RUN printf "Package: *net*\nPin: origin packages.microsoft.com\nPin-Priority: 1001\n" >/etc/apt/preferences.d/dotnet \
     && deps=("libc6" "libgcc1" "libgssapi-krb5-2" "libstdc++6" "zlib1g") \
-    && if [ "${FROM_VERSION}" = "20.04" ]; then deps+=("libicu66" "libssl1.1"); fi \
-    && if [ "${FROM_VERSION}" = "22.04" ]; then deps+=("libicu70" "libssl3" "libunwind8"); fi \
+    && while IFS='' read -r dep; do deps+=("$dep"); done < <(echo "${DOTNET_DEPS}" | jq -r '.[]') \
     && apt-get -y update &>/dev/null \
     && apt-get -y install --no-install-recommends \
         "${deps[@]}" \
     && curl -fsSL https://dot.net/v1/dotnet-install.sh | bash -s -- \
         --install-dir "${DOTNET_ROOT}" \
         --no-path \
-        --channel LTS \
+        --channel "${DOTNET_CHANNEL}" \
         --version "${DOTNET_SDK_VERSION}" \
     && rm -rf /etc/apt/preferences.d/dotnet \
     && sed "s|^PATH=|PATH=${DOTNET_ROOT}:|mg" -i /etc/environment \
