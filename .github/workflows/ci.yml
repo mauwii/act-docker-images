@@ -171,7 +171,6 @@ jobs:
         name: Docker Scout compare
         id: pr-quickview
         if: ${{ github.event_name == 'pull_request' && steps.meta.outputs.tag != steps.meta.outputs.main_tag && vars.DOCKERHUB_USERNAME != '' }}
-        continue-on-error: true
         with:
           command: compare
           platform: ${{ steps.meta.outputs.arch }}
@@ -192,7 +191,7 @@ jobs:
       ${{ github.actor != 'nektos/act' &&
       contains(fromJson('["mauwii","dependabot[bot]"]'), github.triggering_actor) &&
       github.event_name == 'pull_request' &&
-      success() }}
+      (success() || cancelled()) }}
     permissions:
       contents: read
       pull-requests: write
