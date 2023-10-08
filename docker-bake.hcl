@@ -86,20 +86,20 @@ target "ubuntu" {
   matrix = {
     release = [
       {
-        major    = "22"
-        minor    = "04"
-        codename = "jammy"
-        DOTNET_CHANNEL = "STS"
-        DOTNET_DEPS = "[\"libicu70\",\"libssl3\",\"libunwind8\"]"
+        major              = "22"
+        minor              = "04"
+        codename           = "jammy"
+        DOTNET_CHANNEL     = "STS"
+        DOTNET_DEPS        = "[\"libicu70\",\"libssl3\",\"libunwind8\"]"
         DOTNET_SDK_VERSION = "7.0.401"
         POWERSHELL_VERSION = "7.3.7"
       },
       {
-        major    = "20"
-        minor    = "04"
-        codename = "focal"
-        DOTNET_CHANNEL = "LTS"
-        DOTNET_DEPS = "[\"libicu66\",\"libssl1.1\"]"
+        major              = "20"
+        minor              = "04"
+        codename           = "focal"
+        DOTNET_CHANNEL     = "LTS"
+        DOTNET_DEPS        = "[\"libicu66\",\"libssl1.1\"]"
         DOTNET_SDK_VERSION = "6.0.414"
         POWERSHELL_VERSION = "7.2.13"
       }
