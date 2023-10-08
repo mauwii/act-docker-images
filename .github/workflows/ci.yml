@@ -5,7 +5,6 @@ name: ci
 
 on:
   push:
-    branches: [main]
     paths:
       - '**/Dockerfile'
       - '**/.github/workflows/ci.yml'
