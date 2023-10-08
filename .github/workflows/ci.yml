@@ -171,6 +171,7 @@ jobs:
         name: Docker Scout compare
         id: pr-quickview
         if: ${{ github.event_name == 'pull_request' && steps.meta.outputs.tag != steps.meta.outputs.main_tag && vars.DOCKERHUB_USERNAME != '' }}
+        continue-on-error: true
         with:
           command: compare
           platform: ${{ steps.meta.outputs.arch }}
