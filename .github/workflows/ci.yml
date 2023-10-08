@@ -118,7 +118,7 @@ jobs:
       - uses: ./.github/actions/free-space
         name: Free up disk space
         with:
-          deleteDotnet: 'true'
+          deleteDotnet: 'false'
           deleteAndroid: 'true'
 
       - name: Get meta data
