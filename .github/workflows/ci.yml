@@ -167,9 +167,9 @@ jobs:
 
       # vulnerability scanning to verify PRs
       # kics-scan ignore-line
-      - uses: docker/scout-action@64ca6fb5e6ada64f5febd1a991b499900b29faf0
+      - uses: docker/scout-action@v1.0.8
         name: Docker Scout compare
-        id: pr-quickview
+        id: pr-compare
         if: ${{ github.event_name == 'pull_request' && steps.meta.outputs.tag != steps.meta.outputs.main_tag && vars.DOCKERHUB_USERNAME != '' }}
         with:
           command: compare
