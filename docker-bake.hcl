@@ -34,10 +34,6 @@ variable "GITHUB_ACTOR" {
   default = GITHUB_REPOSITORY_OWNER
 }
 
-variable "FROM_IMAGE" {
-  default = "buildpack-deps"
-}
-
 variable "BICEP_VERSION" {
   default = "v0.21.1"
 }
@@ -86,8 +82,7 @@ target "ubuntu" {
   matrix = {
     release = [
       {
-        major              = "22"
-        minor              = "04"
+        version            = "22.04"
         codename           = "jammy"
         DOTNET_CHANNEL     = "STS"
         DOTNET_DEPS        = "[\"libicu70\",\"libssl3\",\"libunwind8\"]"
@@ -95,8 +90,7 @@ target "ubuntu" {
         POWERSHELL_VERSION = "7.3.7"
       },
       {
-        major              = "20"
-        minor              = "04"
+        version            = "20.04"
         codename           = "focal"
         DOTNET_CHANNEL     = "LTS"
         DOTNET_DEPS        = "[\"libicu66\",\"libssl1.1\"]"
@@ -109,13 +103,10 @@ target "ubuntu" {
     BICEP_VERSION                 = BICEP_VERSION
     CODENAME                      = release.codename
     DEPENDENCIES                  = DEPENDENCIES
-    DISTRO                        = "ubuntu"
     DOTNET_CHANNEL                = release.DOTNET_CHANNEL
     DOTNET_DEPS                   = release.DOTNET_DEPS
     DOTNET_SDK_VERSION            = release.DOTNET_SDK_VERSION
-    FROM_IMAGE                    = FROM_IMAGE
-    FROM_VERSION_MAJOR            = release.major
-    FROM_VERSION_MINOR            = release.minor
+    FROM_VERSION                  = release.version
     GOLANG_SHA256_amd64           = GOLANG_SHA256_amd64
     GOLANG_SHA256_arm64           = GOLANG_SHA256_arm64
     GOLANG_VERSION                = GOLANG_VERSION
@@ -134,9 +125,9 @@ target "ubuntu" {
     and(notequal("nektos/act", GITHUB_ACTOR), notequal(REF_NAME, "local")) ? "${REGISTRY}/${GITHUB_REPOSITORY_OWNER}/ubuntu-act:cache-${release.codename}" : ""
   ]
   tags = [
-    "${REGISTRY}/${GITHUB_REPOSITORY_OWNER}/ubuntu-act:${release.major}.${release.minor}-${replace(REF_NAME, "/", "-")}",
-    and(notequal(GITHUB_SHA, null), equal("${REF_NAME}", "main")) ? "${REGISTRY}/${GITHUB_REPOSITORY_OWNER}/ubuntu-act:${release.major}.${release.minor}-${substr(GITHUB_SHA, 0, 7)}" : "",
-    equal("${REF_NAME}", "main") ? "${REGISTRY}/${GITHUB_REPOSITORY_OWNER}/ubuntu-act:${release.major}.${release.minor}" : "",
+    "${REGISTRY}/${GITHUB_REPOSITORY_OWNER}/ubuntu-act:${release.version}-${replace(REF_NAME, "/", "-")}",
+    and(notequal(GITHUB_SHA, null), equal("${REF_NAME}", "main")) ? "${REGISTRY}/${GITHUB_REPOSITORY_OWNER}/ubuntu-act:${release.version}-${substr(GITHUB_SHA, 0, 7)}" : "",
+    equal("${REF_NAME}", "main") ? "${REGISTRY}/${GITHUB_REPOSITORY_OWNER}/ubuntu-act:${release.version}" : "",
     and(equal("${REF_NAME}", "main"), equal(release.codename, "jammy")) ? "${REGISTRY}/${GITHUB_REPOSITORY_OWNER}/ubuntu-act:latest" : "",
   ]
   labels = {

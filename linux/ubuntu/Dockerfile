@@ -1,10 +1,7 @@
 # syntax=docker/dockerfile:1
-# kics-scan disable=e36d8880-3f78-4546-b9a1-12f0745ca0d5,965a08d7-ef86-4f14-8792-4a3b2098937e,77783205-c4ca-4f80-bb80-c777f267c547
-ARG FROM_IMAGE=buildpack-deps
-ARG FROM_VERSION_MAJOR=22
-ARG FROM_VERSION_MINOR=04
-ARG FROM_VERSION=${FROM_VERSION_MAJOR}.${FROM_VERSION_MINOR}
-FROM ${FROM_IMAGE}:${FROM_VERSION} as base
+# kics-scan disable=e36d8880-3f78-4546-b9a1-12f0745ca0d5,965a08d7-ef86-4f14-8792-4a3b2098937e,77783205-c4ca-4f80-bb80-c777f267c547,0008c003-79aa-42d8-95b8-1c2fe37dbfe6
+ARG FROM_VERSION=22.04
+FROM buildpack-deps:${FROM_VERSION} as base
 
 # Force apt to not be interactive/not ask
 ENV DEBIAN_FRONTEND=noninteractive
@@ -13,15 +10,21 @@ ENV DEBIAN_FRONTEND=noninteractive
 RUN echo "APT::Get::Assume-Yes \"true\";" >/etc/apt/apt.conf.d/90assumeyes
 
 # set locale
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends \
+ARG language=en_US
+RUN apt-get -y update \
+    && apt-get -y install --no-install-recommends \
         locales \
+    && apt-get clean \
+    && rm -rf /etc/apt/sources.list.d/* \
     && rm -rf /var/lib/apt/lists/* \
-    && localedef -i en_US -c -f UTF-8 -A /usr/share/locale/locale.alias en_US.UTF-8
-
-ENV LANG=en_US.UTF-8 \
-    LANGUAGE=en_US:en \
-    LC_ALL=en_US.UTF-8 \
+    && localedef \
+        --inputfile="${language}" \
+        --force \
+        --charmap="UTF-8" \
+        --alias-file=/usr/share/locale/locale.alias "${language}.UTF-8"
+ENV LANG=${language}.utf8 \
+    LANGUAGE=${language} \
+    LC_ALL=${language}.utf8 \
     RUNNER_MANUALLY_TRAP_SIG=1 \
     ACTIONS_RUNNER_PRINT_LOG_TO_STDOUT=1
 
@@ -66,13 +69,6 @@ FROM base as act-base
 # automatic buildx ARGs
 ARG TARGETARCH
 
-# ARGs used before `FROM` are not accessible afterwards
-ARG FROM_IMAGE
-ARG FROM_VERSION_MAJOR=22
-ARG FROM_VERSION_MINOR=04
-ARG FROM_VERSION=${FROM_VERSION_MAJOR}.${FROM_VERSION_MINOR}
-ARG DISTRO=ubuntu
-
 # enable pipefail and set workdir
 SHELL [ "/bin/bash", "--login", "-e", "-o", "pipefail", "-c" ]
 WORKDIR /tmp
@@ -80,16 +76,24 @@ WORKDIR /tmp
 # setup environment
 ENV AGENT_TOOLSDIRECTORY=/opt/hostedtoolcache \
     AZURE_EXTENSION_DIR=/opt/az/azcliextensions
-RUN locale | tee -a /etc/environment \
+RUN apt-get -y update \
+    && apt-get -y install --no-install-recommends \
+        lsb-release \
+    && apt-get clean \
+    && rm -rf /etc/apt/sources.list.d/* \
+    && rm -rf /var/lib/apt/lists/* \
+    && distro=$(lsb_release --id --short) \
+    && version=$(lsb_release --release --short) \
+    && locale | tee -a /etc/environment \
     && sed 's|"||g' -i "/etc/environment" \
-    && echo "IMAGE_OS=${DISTRO}${FROM_VERSION_MAJOR}" | tee -a /etc/environment \
-    && echo "ImageOS=${DISTRO}${FROM_VERSION_MAJOR}" | tee -a /etc/environment \
-    && echo "LSB_RELEASE=${FROM_VERSION}" | tee -a /etc/environment \
+    && echo "IMAGE_OS=${distro}${version::2}" | tee -a /etc/environment \
+    && echo "ImageOS=${distro}${version::2}" | tee -a /etc/environment \
+    && echo "LSB_RELEASE=${version}" | tee -a /etc/environment \
     && echo "AGENT_TOOLSDIRECTORY=${AGENT_TOOLSDIRECTORY}" | tee -a /etc/environment \
-    && echo "AZURE_EXTENSION_DIR=$AZURE_EXTENSION_DIR" | tee -a /etc/environment \
+    && echo "AZURE_EXTENSION_DIR=${AZURE_EXTENSION_DIR}" | tee -a /etc/environment \
     && echo "RUN_TOOL_CACHE=${AGENT_TOOLSDIRECTORY}" | tee -a /etc/environment \
     && echo "DEPLOYMENT_BASEPATH=/opt/runner" | tee -a /etc/environment \
-    && echo "LSB_OS_VERSION=${FROM_VERSION_MAJOR}${FROM_VERSION_MINOR}" | tee -a /etc/environment \
+    && echo "LSB_OS_VERSION=${version//./}" | tee -a /etc/environment \
     && echo "USER=$(whoami)" | tee -a /etc/environment \
     && echo "RUNNER_USER=$(whoami)" | tee -a /etc/environment \
     && echo "RUNNER_MANUALLY_TRAP_SIG=${RUNNER_MANUALLY_TRAP_SIG}" | tee -a /etc/environment \
@@ -273,7 +277,7 @@ RUN apt-get -y clean \
     || echo 'Failed to delete directories'
 
 # kics-scan ignore-line
-FROM act-base as powershell
+FROM act-base as act-powershell
 SHELL [ "/bin/bash", "--login", "-e", "-o", "pipefail", "-c" ]
 # Install PowerShell global tool
 ARG TARGETARCH
@@ -287,17 +291,29 @@ RUN dotnet tool install \
     && ln -s "${TOOL_PATH_PWSH}/pwsh" /usr/local/bin/pwsh \
     && chmod 755 "${TOOL_PATH_PWSH}/pwsh" \
     && [[ "$(pwsh --version)" =~ ${POWERSHELL_VERSION} ]]
+#     && pwsh -NonInteractive -Command "Install-PackageProvider -Name NuGet -MinimumVersion '2.8.5.201' -Force -Scope AllUsers" \
 
 # kics-scan ignore-line
-FROM powershell as powershell-modules
+FROM act-powershell as act-powershell-modules
 ARG TARGETARCH
 SHELL [ "/bin/bash", "--login", "-e", "-o", "pipefail", "-c" ]
 ARG POWERSHELL_MODULES
+# Trust PSGallery and install Powershell-/Azure Modules
+RUN pwsh -NonInteractive -Command "Set-PSRepository -Name PSGallery -InstallationPolicy Trusted" \
+    && while IFS='' read -r pwshModule; do echo "installing ${pwshModule}" \
+        && pwsh -NonInteractive -Command "Install-Module -Name ${pwshModule} -Scope AllUsers -Repository PSGallery"; done \
+        < <(printf "%s\n" "${POWERSHELL_MODULES}" | jq -r '.[]')
+
+# kics-scan ignore-line
+FROM act-powershell as act-powershell-az-modules
+ARG TARGETARCH
+SHELL [ "/bin/bash", "--login", "-e", "-o", "pipefail", "-c" ]
 ARG POWERSHELL_AZ_MODULE_VERSIONS
 # Trust PSGallery and install Powershell-/Azure Modules
 RUN pwsh -NonInteractive -Command "Set-PSRepository -Name PSGallery -InstallationPolicy Trusted" \
-    && while IFS='' read -r pwshModule; do echo "installing ${pwshModule}" && pwsh -NonInteractive -Command "Install-Module -Name ${pwshModule} -Scope AllUsers -Repository PSGallery"; done < <(echo "${POWERSHELL_MODULES}" | jq -r '.[]') \
-    && while IFS='' read -r azVersion; do echo "installing Az ${azVersion}" && pwsh -NonInteractive -Command "Install-Module -Name Az -RequiredVersion ${azVersion} -Scope AllUsers -Repository PSGallery"; done < <(echo "${POWERSHELL_AZ_MODULE_VERSIONS}" | jq -r '.[]')
+    && while IFS='' read -r azVersion; do echo "installing Az ${azVersion}" \
+        && pwsh -NonInteractive -Command "Install-Module -Name Az -RequiredVersion ${azVersion} -Scope AllUsers -Repository PSGallery"; done \
+        < <(printf "%s\n" "${POWERSHELL_AZ_MODULE_VERSIONS}" | jq -r '.[]')
 
 # kics-scan ignore-line
 FROM act-base as act
@@ -318,11 +334,12 @@ COPY --from=bicep /usr/local/bin/bicep /usr/local/bin/bicep
 
 # add PowerShell
 ARG TOOL_PATH_PWSH=/usr/share/powershell
-COPY --from=powershell ${TOOL_PATH_PWSH} ${TOOL_PATH_PWSH}
+COPY --from=act-powershell ${TOOL_PATH_PWSH} ${TOOL_PATH_PWSH}
 RUN ln -s "${TOOL_PATH_PWSH}/pwsh" /usr/local/bin/pwsh
 
 # add  PowerShell-modules
-COPY --from=powershell-modules /usr/local/share/powershell /usr/local/share/powershell
+COPY --from=act-powershell-modules /usr/local/share/powershell /usr/local/share/powershell
+COPY --from=act-powershell-az-modules /usr/local/share/powershell /usr/local/share/powershell
 
 ARG RUNNER
 USER ${RUNNER}
