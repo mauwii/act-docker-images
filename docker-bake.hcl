@@ -85,9 +85,9 @@ target "ubuntu" {
         version            = "22.04"
         codename           = "jammy"
         DOTNET_CHANNEL     = "STS"
-        DOTNET_DEPS        = "[\"libicu70\",\"libssl3\",\"libunwind8\"]"
+        DOTNET_DEPS        = "[\"libicu70\",\"libssl3\",\"libunwind8\",\"libgcc-s1\",\"liblttng-ust1\"]"
         DOTNET_SDK_VERSION = "7.0.402"
-        POWERSHELL_VERSION = "7.3.7"
+        POWERSHELL_VERSION = "7.3.8"
       },
       {
         version            = "20.04"
