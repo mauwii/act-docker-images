@@ -151,8 +151,8 @@ To execute the mega-linter locally without the needs to install it, there are di
   act -W .github/workflows/mega-linter.yml
   ```
 
-  This has the advantage that megalinter executes with the same settings as the workflow itself
-  would do, while not providing fixed versions if errors where found
+  This has the advantage that megalinter executes with the same settings as the workflow itself,
+  while not providing fixed versions if errors where found.
 
 - or you could use npx:
 
@@ -162,9 +162,6 @@ To execute the mega-linter locally without the needs to install it, there are di
       -e GITHUB_TOKEN="$(gh auth token)" \
       --remove-container
   ```
-
-  The flavor is optional but can be pretty useful if you have low bandwidth or limited storage,
-  while the GH Action is currently using the full megalinter image.
 
 ## Pre-Commit-Hook
 
