@@ -11,7 +11,7 @@ RUN echo "APT::Get::Assume-Yes \"true\";" >/etc/apt/apt.conf.d/90assumeyes
 
 # set locale
 ARG language=en_US
-RUN apt-get -y update \
+RUN apt-get -y update >/dev/null \
     && apt-get -y install --no-install-recommends \
         locales \
     && apt-get clean \
@@ -20,7 +20,7 @@ RUN apt-get -y update \
     && localedef \
         --inputfile="${language}" \
         --force \
-        --charmap="UTF-8" \
+        --charmap=UTF-8 \
         --alias-file=/usr/share/locale/locale.alias "${language}.UTF-8"
 ENV LANG=${language}.utf8 \
     LANGUAGE=${language} \
@@ -107,8 +107,9 @@ RUN ssh-keyscan github.com >>/etc/ssh/ssh_known_hosts \
 # Install dependencies
 ARG DEPENDENCIES
 RUN apt-get -y update &>/dev/null \
-    && apt-get -y install --no-install-recommends jq && packages=() \
-    && while IFS='' read -r pkg; do echo "adding $pkg" && packages+=("$pkg"); done < <(echo "${DEPENDENCIES}" | jq -r '.[]') \
+    && apt-get -y install --no-install-recommends jq \
+    && packages=() \
+    && while IFS='' read -r pkg; do packages+=("$pkg"); done < <(printf "%s\n" "${DEPENDENCIES}" | jq -r '.[]') \
     && apt-get -y install --no-install-recommends \
         "${packages[@]}" \
     && apt-get clean \
@@ -177,7 +178,7 @@ ENV DOTNET_CLI_TELEMETRY_OPTOUT=1 \
 # install .NET SDK
 RUN printf "Package: *net*\nPin: origin packages.microsoft.com\nPin-Priority: 1001\n" >/etc/apt/preferences.d/dotnet \
     && deps=("libc6" "libgcc1" "libgssapi-krb5-2" "libstdc++6" "zlib1g") \
-    && while IFS='' read -r dep; do deps+=("$dep"); done < <(echo "${DOTNET_DEPS}" | jq -r '.[]') \
+    && while IFS='' read -r dep; do deps+=("$dep"); done < <(printf "%s\n" "${DOTNET_DEPS}" | jq -r '.[]') \
     && apt-get -y update &>/dev/null \
     && apt-get -y install --no-install-recommends \
         "${deps[@]}" \

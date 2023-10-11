@@ -86,7 +86,7 @@ target "ubuntu" {
         codename           = "jammy"
         DOTNET_CHANNEL     = "STS"
         DOTNET_DEPS        = "[\"libicu70\",\"libssl3\",\"libunwind8\"]"
-        DOTNET_SDK_VERSION = "7.0.401"
+        DOTNET_SDK_VERSION = "7.0.402"
         POWERSHELL_VERSION = "7.3.7"
       },
       {
