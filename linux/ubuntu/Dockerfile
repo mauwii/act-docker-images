@@ -289,7 +289,7 @@ RUN dotnet tool install \
     --version "${POWERSHELL_VERSION}" \
     PowerShell \
     && find "${TOOL_PATH_PWSH}" -print | grep -i '.*[.]nupkg$' | xargs rm \
-    && ln -s "${TOOL_PATH_PWSH}/pwsh" /usr/local/bin/pwsh \
+    && ln -s "$(realpath --relative-to=/usr/local/bin "${TOOL_PATH_PWSH}")/pwsh" /usr/local/bin/pwsh \
     && chmod 755 "${TOOL_PATH_PWSH}/pwsh" \
     && [[ "$(pwsh --version)" =~ ${POWERSHELL_VERSION} ]]
 #     && pwsh -NonInteractive -Command "Install-PackageProvider -Name NuGet -MinimumVersion '2.8.5.201' -Force -Scope AllUsers" \
@@ -336,7 +336,7 @@ COPY --from=bicep /usr/local/bin/bicep /usr/local/bin/bicep
 # add PowerShell
 ARG TOOL_PATH_PWSH=/usr/share/powershell
 COPY --from=act-powershell ${TOOL_PATH_PWSH} ${TOOL_PATH_PWSH}
-RUN ln -s "${TOOL_PATH_PWSH}/pwsh" /usr/local/bin/pwsh
+RUN ln -s "$(realpath --relative-to=/usr/local/bin "${TOOL_PATH_PWSH}")/pwsh" /usr/local/bin/pwsh
 
 # add  PowerShell-modules
 COPY --from=act-powershell-modules /usr/local/share/powershell /usr/local/share/powershell

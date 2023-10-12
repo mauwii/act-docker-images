@@ -113,6 +113,7 @@
     "pulumi",
     "pwsh",
     "quickview",
+    "realpath",
     "rubygems",
     "sarif",
     "semgrep",
