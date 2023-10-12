@@ -194,7 +194,7 @@ jobs:
           to: ${{ steps.meta.outputs.main_tag }}
           ignore-unchanged: true
           only-fixed: true
-          only-severities: critical,high
+          only-severities: critical
           write-comment: ${{ github.actor != 'nektos/act' }}
           summary: ${{ github.actor != 'nektos/act' }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
