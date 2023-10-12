@@ -84,17 +84,17 @@ target "ubuntu" {
       {
         version            = "22.04"
         codename           = "jammy"
-        DOTNET_CHANNEL     = "STS"
+        DOTNET_CHANNEL     = "LTS"
         DOTNET_DEPS        = "[\"libicu70\",\"libssl3\",\"libunwind8\",\"libgcc-s1\",\"liblttng-ust1\"]"
-        DOTNET_SDK_VERSION = "7.0.402"
-        POWERSHELL_VERSION = "7.3.8"
+        DOTNET_SDK_VERSION = "6.0.415"
+        POWERSHELL_VERSION = "7.2.13"
       },
       {
         version            = "20.04"
         codename           = "focal"
         DOTNET_CHANNEL     = "LTS"
         DOTNET_DEPS        = "[\"libicu66\",\"libssl1.1\"]"
-        DOTNET_SDK_VERSION = "6.0.414"
+        DOTNET_SDK_VERSION = "6.0.415"
         POWERSHELL_VERSION = "7.2.13"
       }
     ]

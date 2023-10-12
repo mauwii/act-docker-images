@@ -17,8 +17,8 @@ permissions:
   contents: read
 
 env:
-  REGISTRY: ${{ (vars.DOCKERHUB_USERNAME != '' && secrets.DOCKERHUB_TOKEN != '') && 'docker.io' || 'ghcr.io' }}
-  REGISTRY_USER: ${{ (vars.DOCKERHUB_USERNAME != '' && secrets.DOCKERHUB_TOKEN != '') && vars.DOCKERHUB_USERNAME || github.repository_owner }}
+  CONTAINER_REGISTRY: ${{ (vars.DOCKERHUB_USERNAME != '' && secrets.DOCKERHUB_TOKEN != '') && 'docker.io' || 'ghcr.io' }}
+  CONTAINER_REGISTRY_USER: ${{ (vars.DOCKERHUB_USERNAME != '' && secrets.DOCKERHUB_TOKEN != '') && vars.DOCKERHUB_USERNAME || github.repository_owner }}
   GITHUB_SHA: ${{ github.event.pull_request.head.sha || github.event.after || github.sha }}
   BUILDKIT_PROGRESS: plain
 
@@ -47,7 +47,7 @@ jobs:
           while IFS='' read -r container_tag; do
               printf "Container tag: %s\n" "${container_tag}"
               [[ "${container_tag}" == *"-local" ]] || exit 1
-          done < <(env -i ${{ steps.docker-binary-path.outputs.docker-bin }} buildx bake --print  | jq -r '.target[].tags[0]')
+          done < <(env -i ${{ steps.docker-binary-path.outputs.docker-bin }} buildx bake --print | jq -r '.target[].tags[0]')
 
       - name: Print the bake file with the runner env
         run: docker buildx bake --print
@@ -85,7 +85,7 @@ jobs:
       pull-requests: write
       security-events: write
     strategy:
-      fail-fast: ${{ github.event_name != 'pull_request' }}
+      fail-fast: ${{ fromJson(github.event_name != 'pull_request') }}
       matrix:
         targets: ${{ fromJson(needs.generate-jobs.outputs.targets) }}
     steps:
@@ -106,11 +106,11 @@ jobs:
       # https://github.com/docker/login-action
       # kics-scan ignore-line
       - uses: docker/login-action@v3.0.0
-        name: Login to ${{ env.REGISTRY }}
+        name: Login to ${{ env.CONTAINER_REGISTRY }}
         with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ env.REGISTRY_USER }}
-          password: ${{ env.REGISTRY == 'docker.io' && secrets.DOCKERHUB_TOKEN || secrets.GITHUB_TOKEN }}
+          registry: ${{ env.CONTAINER_REGISTRY }}
+          username: ${{ env.CONTAINER_REGISTRY_USER }}
+          password: ${{ env.CONTAINER_REGISTRY == 'docker.io' && secrets.DOCKERHUB_TOKEN || secrets.GITHUB_TOKEN }}
           logout: true
 
       # Free up space on the runner since the image is huge
@@ -138,6 +138,7 @@ jobs:
         with:
           files: docker-bake.hcl
           targets: ${{ matrix.targets }}
+          pull: true
           sbom: ${{ github.event_name != 'pull_request' }}
           provenance: ${{ github.event_name != 'pull_request' }}
           set: |
@@ -146,13 +147,13 @@ jobs:
           push: ${{ github.event_name != 'pull_request' && github.actor != 'nektos/act' }}
           load: ${{ github.event_name == 'pull_request' }}
 
-      # vulnerability scan the image
+      # vulnerability scan the image for main branch
       # kics-scan ignore-line
       - uses: docker/scout-action@v1.0.8
         name: Analyze for critical and high CVEs
         id: docker-scout-cves
         continue-on-error: true
-        if: ${{ github.event_name != 'pull_request' && github.actor != 'nektos/act' }}
+        if: ${{ github.event_name != 'pull_request' && github.actor != 'nektos/act' && github.ref_name == 'main' }}
         with:
           command: cves
           image: ${{ steps.meta.outputs.tag }}
