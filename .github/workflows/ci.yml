@@ -75,12 +75,12 @@ jobs:
       - name: Generate targets matrix
         id: targets
         run: |
-          printf "matrix=%s\n" "$(docker buildx bake --print | jq -r '"\(.target | keys)"')" | tee "${GITHUB_OUTPUT}"
+          printf "matrix={\"targets\": %s}\n" "$(docker buildx bake --print | jq -r '"\(.target | keys)"')" | tee "${GITHUB_OUTPUT}"
 
       - name: Generate platforms matrix
         id: platforms
         run: |
-          printf "matrix=%s\n" "$(docker buildx bake linux-platforms --print | jq -cr '.target."linux-platforms".platforms')" | tee "${GITHUB_OUTPUT}"
+          printf "matrix={\"targets\": %s, \"platforms\": %s}\n" "$(docker buildx bake --print | jq -r '"\(.target | keys)"')" "$(docker buildx bake linux-platforms --print | jq -cr '.target."linux-platforms".platforms')" | tee "${GITHUB_OUTPUT}"
 
   build:
     needs: [generate-jobs]
@@ -91,10 +91,8 @@ jobs:
       pull-requests: write
       security-events: write
     strategy:
-      fail-fast: ${{ fromJson(format('{0}', github.event_name != 'pull_request')) }}
-      matrix:
-        targets: ${{ fromJson(needs.generate-jobs.outputs.targets) }}
-        platforms: ${{ github.event_name == 'pull_request' && fromJson(needs.generate-jobs.outputs.platforms) || '[]' }}
+      fail-fast: ${{ github.event_name != 'pull_request' }}
+      matrix: ${{ github.event_name != 'pull_request' && fromJson(needs.generate-jobs.outputs.targets) || fromJson(needs.generate-jobs.outputs.platforms) }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4.1.0
