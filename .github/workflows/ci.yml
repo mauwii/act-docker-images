@@ -19,6 +19,7 @@ permissions:
 env:
   CONTAINER_REGISTRY: ${{ (vars.DOCKERHUB_USERNAME != '' && secrets.DOCKERHUB_TOKEN != '') && 'docker.io' || 'ghcr.io' }}
   CONTAINER_REGISTRY_USER: ${{ (vars.DOCKERHUB_USERNAME != '' && secrets.DOCKERHUB_TOKEN != '') && vars.DOCKERHUB_USERNAME || github.repository_owner }}
+  CONTAINER_PUSH: ${{ github.event_name != 'pull_request' && github.actor != 'nektos/act' }}
   GITHUB_SHA: ${{ github.event.pull_request.head.sha || github.event.after || github.sha }}
   BUILDKIT_PROGRESS: plain
 
@@ -66,7 +67,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       targets: ${{ steps.targets.outputs.matrix }}
-      # platforms: ${{ steps.platforms.outputs.matrix }}
+      platforms: ${{ steps.platforms.outputs.matrix }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4.1.0
@@ -75,6 +76,11 @@ jobs:
         id: targets
         run: |
           printf "matrix=%s\n" "$(docker buildx bake --print | jq -r '"\(.target | keys)"')" | tee "${GITHUB_OUTPUT}"
+
+      - name: Generate platforms matrix
+        id: platforms
+        run: |
+          printf "matrix=%s\n" "$(docker buildx bake linux-platforms --print | jq -cr '.target."linux-platforms".platforms')" | tee "${GITHUB_OUTPUT}"
 
   build:
     needs: [generate-jobs]
@@ -88,6 +94,7 @@ jobs:
       fail-fast: ${{ fromJson(format('{0}', github.event_name != 'pull_request')) }}
       matrix:
         targets: ${{ fromJson(needs.generate-jobs.outputs.targets) }}
+        platforms: ${{ github.event_name == 'pull_request' && fromJson(needs.generate-jobs.outputs.platforms) || '[]' }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4.1.0
@@ -100,7 +107,7 @@ jobs:
         # kics-scan ignore-line
         uses: docker/setup-buildx-action@v3.0.0
         with:
-          driver: ${{ github.event_name == 'pull_request' && 'docker' || 'docker-container' }}
+          driver: docker-container
 
       # Login against a container registry
       # https://github.com/docker/login-action
@@ -125,10 +132,15 @@ jobs:
         id: meta
         run: |
           {
-            printf "arch=linux/%s\n" "$(docker run --rm --quiet ubuntu:22.04 dpkg --print-architecture)";
             printf "tag=%s\n" "$(docker buildx bake ${{ matrix.targets }} --print | jq -r '.target[].tags[0]')";
             printf "main_tag=%s\n" "$(REF_NAME=main docker buildx bake ${{ matrix.targets }} --print | jq -r '.target[].tags[0]')";
           } | tee "${GITHUB_OUTPUT}"
+
+      - name: Create directory for docker output
+        if: github.event_name == 'pull_request'
+        run: 'mkdir -p "${DIRNAME}"'
+        env:
+          DIRNAME: ${{ format('{0}/{1}', github.workspace, matrix.platforms) }}
 
       # Bake the image
       # kics-scan ignore-line
@@ -143,9 +155,9 @@ jobs:
           provenance: ${{ github.event_name != 'pull_request' }}
           set: |
             ${{ github.event_name == 'pull_request' && '*.cache-to=' || '' }}
-            ${{ github.event_name == 'pull_request' && format('*.platform={0}', steps.meta.outputs.arch) || '' }}
-          push: ${{ github.event_name != 'pull_request' && github.actor != 'nektos/act' }}
-          load: ${{ github.event_name == 'pull_request' }}
+            ${{ github.event_name == 'pull_request' && format('*.output=type=docker,dest={0}/{1}/{2}.tar', github.workspace, matrix.platforms, matrix.targets) || '' }}
+            ${{ github.event_name == 'pull_request' && format('*.platform={0}', matrix.platforms) || '' }}
+          push: ${{ env.CONTAINER_PUSH }}
 
       # vulnerability scan the image for main branch
       # kics-scan ignore-line
@@ -153,9 +165,10 @@ jobs:
         name: Analyze for critical and high CVEs
         id: docker-scout-cves
         continue-on-error: true
-        if: ${{ github.event_name != 'pull_request' && github.actor != 'nektos/act' && github.ref_name == 'main' }}
+        if: env.CONTAINER_PUSH == 'true' && github.ref_name == 'main'
         with:
           command: cves
+          only-severities: critical,high
           image: ${{ steps.meta.outputs.tag }}
           sarif-file: sarif.output.json
           summary: false
@@ -164,7 +177,7 @@ jobs:
       - uses: github/codeql-action/upload-sarif@v2.22.0
         name: Upload SARIF result
         id: upload-sarif
-        if: ${{ github.event_name != 'pull_request' && github.actor != 'nektos/act' && steps.docker-scout-cves.outcome == 'success' }}
+        if: steps.docker-scout-cves.outcome == 'success'
         with:
           sarif_file: sarif.output.json
 
@@ -173,11 +186,11 @@ jobs:
       - uses: docker/scout-action@v1.0.8
         name: Docker Scout compare
         id: pr-compare
-        if: ${{ github.event_name == 'pull_request' && steps.meta.outputs.tag != steps.meta.outputs.main_tag && vars.DOCKERHUB_USERNAME != '' }}
+        if: github.event_name == 'pull_request' && vars.DOCKERHUB_USERNAME != ''
         with:
           command: compare
-          platform: ${{ steps.meta.outputs.arch }}
-          image: ${{ steps.meta.outputs.tag }}
+          platform: ${{ matrix.platforms }}
+          image: ${{ format('archive://{0}/{1}/{2}.tar', github.workspace, matrix.platforms, matrix.targets) }}
           to: ${{ steps.meta.outputs.main_tag }}
           ignore-unchanged: true
           only-fixed: true
@@ -190,11 +203,7 @@ jobs:
     name: Approve PR
     runs-on: ubuntu-latest
     needs: [build]
-    if: >-
-      ${{ github.actor != 'nektos/act' &&
-      contains(fromJson('["mauwii","dependabot[bot]"]'), github.triggering_actor) &&
-      github.event_name == 'pull_request' &&
-      (success() || cancelled()) }}
+    if: contains(fromJson('["mauwii","dependabot[bot]"]'), github.triggering_actor) && github.event_name == 'pull_request' && needs.build.result == 'success'
     permissions:
       contents: read
       pull-requests: write
