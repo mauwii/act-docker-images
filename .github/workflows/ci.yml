@@ -28,11 +28,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4.1.0
+        uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608
 
       - name: Setup Docker Buildx
         # kics-scan ignore-line
-        uses: docker/setup-buildx-action@v3.0.0
+        uses: docker/setup-buildx-action@f95db51fddba0c2d1ec667646a06c2ce06100226
 
       # get docker binary path to use it with env -i
       - name: Get the docker binary path
@@ -70,7 +70,7 @@ jobs:
       platforms: ${{ steps.platforms.outputs.matrix }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4.1.0
+        uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608
 
       - name: Generate targets matrix
         id: targets
@@ -95,22 +95,22 @@ jobs:
       matrix: ${{ github.event_name != 'pull_request' && fromJson(needs.generate-jobs.outputs.targets) || fromJson(needs.generate-jobs.outputs.platforms) }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4.1.0
+        uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608
 
       - name: Setup QEMU
         # kics-scan ignore-line
-        uses: docker/setup-qemu-action@v3.0.0
+        uses: docker/setup-qemu-action@68827325e0b33c7199eb31dd4e31fbe9023e06e3
 
       - name: Setup Docker Buildx
         # kics-scan ignore-line
-        uses: docker/setup-buildx-action@v3.0.0
+        uses: docker/setup-buildx-action@f95db51fddba0c2d1ec667646a06c2ce06100226
         with:
           driver: docker-container
 
       # Login against a container registry
       # https://github.com/docker/login-action
       # kics-scan ignore-line
-      - uses: docker/login-action@v3.0.0
+      - uses: docker/login-action@343f7c4344506bcbf9b4de18042ae17996df046d
         name: Login to ${{ env.CONTAINER_REGISTRY }}
         with:
           registry: ${{ env.CONTAINER_REGISTRY }}
@@ -142,7 +142,7 @@ jobs:
 
       # Bake the image
       # kics-scan ignore-line
-      - uses: docker/bake-action@v4.0.0
+      - uses: docker/bake-action@511fde2517761e303af548ec9e0ea74a8a100112
         name: Build and Push
         id: bake
         with:
@@ -158,7 +158,7 @@ jobs:
 
       # Docker-Scout - Create SBOM
       # kics-scan ignore-line
-      - uses: docker/scout-action@v1.0.8
+      - uses: docker/scout-action@914f29b95fa18690ce41fdee98cf892d78f8c5c0
         name: Create SBOM
         id: docker-scout-sbom
         continue-on-error: true
@@ -171,7 +171,7 @@ jobs:
 
       # vulnerability scan the image for main branch
       # kics-scan ignore-line
-      - uses: docker/scout-action@v1.0.8
+      - uses: docker/scout-action@914f29b95fa18690ce41fdee98cf892d78f8c5c0
         name: Analyze for critical and high CVEs
         id: docker-scout-cves
         continue-on-error: true
@@ -184,7 +184,7 @@ jobs:
           summary: false
       # upload the results as a SARIF file to gh security tab
       # kics-scan ignore-line
-      - uses: github/codeql-action/upload-sarif@v2.22.2
+      - uses: github/codeql-action/upload-sarif@9885f86fab4879632b7e44514f19148225dfbdcd
         name: Upload SARIF result
         id: upload-sarif
         if: steps.docker-scout-cves.outcome == 'success'
@@ -193,7 +193,7 @@ jobs:
 
       # vulnerability scanning to verify PRs
       # kics-scan ignore-line
-      - uses: docker/scout-action@v1.0.8
+      - uses: docker/scout-action@914f29b95fa18690ce41fdee98cf892d78f8c5c0
         name: Docker Scout compare
         id: pr-compare
         if: github.event_name == 'pull_request' && vars.DOCKERHUB_USERNAME != ''
