@@ -131,7 +131,7 @@ jobs:
         run: |
           {
             printf "tag=%s\n" "$(docker buildx bake ${{ matrix.targets }} --print | jq -r '.target[].tags[0]')";
-            printf "to_tag=%s\n" "$(REF_NAME="$([[ -z "${GITHUB_BASE_REF}" ]] && git config --get init.defaultBranch || echo ${GITHUB_BASE_REF})" docker buildx bake ${{ matrix.targets }} --print | jq -r '.target[].tags[0]')";
+            printf "to_tag=%s\n" "$(REF_NAME="$([[ -z "${GITHUB_BASE_REF}" ]] && git config --get init.defaultBranch || echo "${GITHUB_BASE_REF}")" docker buildx bake ${{ matrix.targets }} --print | jq -r '.target[].tags[0]')";
           } | tee "${GITHUB_OUTPUT}"
 
       - name: Create directory for docker output
