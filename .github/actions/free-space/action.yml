@@ -23,7 +23,7 @@ runs:
     # will release about 2GB if you don't need .NET
     - name: Remove .NET
       id: dotnet
-      if: inputs.deleteDotnet && runner.os == 'linux'
+      if: inputs.deleteDotnet == 'true' && runner.os == 'linux'
       shell: bash
       run: |
         for dir in /usr/share/dotnet /opt/hostedtoolcache/dotnet; do
@@ -40,7 +40,7 @@ runs:
     # will release about 13GB if you don't need Android
     - name: Remove android sdk
       id: android
-      if: inputs.deleteAndroid && runner.os == 'linux'
+      if: inputs.deleteAndroid == 'true' && runner.os == 'linux'
       shell: bash
       run: |
         if [ -d /usr/local/lib/android ]; then
