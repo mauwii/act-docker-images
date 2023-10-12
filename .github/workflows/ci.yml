@@ -208,6 +208,7 @@ jobs:
           write-comment: ${{ github.actor != 'nektos/act' }}
           summary: ${{ github.actor != 'nektos/act' }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
+          organization: ${{ vars.DOCKERHUB_USERNAME}}
 
   approve-pr:
     name: Approve PR
