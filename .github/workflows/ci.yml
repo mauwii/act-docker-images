@@ -85,7 +85,7 @@ jobs:
       pull-requests: write
       security-events: write
     strategy:
-      fail-fast: ${{ fromJson(github.event_name != 'pull_request') }}
+      fail-fast: ${{ fromJson(format('{0}', github.event_name != 'pull_request')) }}
       matrix:
         targets: ${{ fromJson(needs.generate-jobs.outputs.targets) }}
     steps:
