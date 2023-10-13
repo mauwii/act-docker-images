@@ -84,7 +84,10 @@ RUN apt-get -y update \
     && rustup component add rustfmt clippy \
     && cargo_tools=() \
     && while IFS='' read -r pkg; do cargo_tools+=("$pkg"); done < <(printf "%s\n" "${CARGO_PACKAGES}" | jq -r '.[]') \
-    && cargo install "${cargo_tools[@]}"
+    && cargo install "${cargo_tools[@]}" \
+    && apt-get clean \
+    && rm -rf /etc/apt/sources.list.d/* \
+    && rm -rf /var/lib/apt/lists/*
 
 FROM base as act-base
 
