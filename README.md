@@ -139,8 +139,6 @@ box with docker desktop).
   When you do this from the main branch and already use the latest image, it will be replaced with
   the one you just built.
 
-If you are not using a mac silicon, just replace the platform `arm64` with `amd64`.
-
 ## mega-linter
 
 To execute the mega-linter locally without the needs to install it, there are different options:

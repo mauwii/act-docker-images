@@ -84,6 +84,7 @@ target "ubuntu" {
       {
         version            = "22.04"
         codename           = "jammy"
+        CARGO_PACKAGES     = "[\"bindgen-cli\",\"cbindgen\",\"cargo-audit\",\"cargo-outdated\"]"
         DOTNET_CHANNEL     = "LTS"
         DOTNET_DEPS        = "[\"libicu70\",\"libssl3\",\"libunwind8\",\"libgcc-s1\",\"liblttng-ust1\"]"
         DOTNET_SDK_VERSION = "6.0.415"
@@ -92,6 +93,7 @@ target "ubuntu" {
       {
         version            = "20.04"
         codename           = "focal"
+        CARGO_PACKAGES     = "[\"--locked\",\"bindgen-cli\",\"cbindgen\",\"cargo-audit\",\"cargo-outdated\"]"
         DOTNET_CHANNEL     = "LTS"
         DOTNET_DEPS        = "[\"libicu66\",\"libssl1.1\"]"
         DOTNET_SDK_VERSION = "6.0.415"
@@ -101,6 +103,8 @@ target "ubuntu" {
   }
   args = {
     BICEP_VERSION                 = BICEP_VERSION
+    CARGO_HOME                    = "/etc/.skel/.cargo"
+    CARGO_PACKAGES                = release.CARGO_PACKAGES
     CODENAME                      = release.codename
     DEPENDENCIES                  = DEPENDENCIES
     DOTNET_CHANNEL                = release.DOTNET_CHANNEL
@@ -115,6 +119,7 @@ target "ubuntu" {
     POWERSHELL_MODULES            = POWERSHELL_MODULES
     POWERSHELL_VERSION            = release.POWERSHELL_VERSION
     PULUMI_VERSION                = PULUMI_VERSION
+    RUSTUP_HOME                   = "/etc/.skel/.rustup"
     TOOL_PATH_PWSH                = "/usr/share/powershell"
   }
   name = "ubuntu-act-${release.codename}"

@@ -46,7 +46,7 @@ RUN mkdir -p /tmp/go \
 FROM base as pulumi
 ARG TARGETARCH
 SHELL [ "/bin/bash", "--login", "-e", "-o", "pipefail", "-c" ]
-COPY --from=golang /usr/local/go /usr/local/go
+COPY --link --from=golang /usr/local/go /usr/local/go
 ENV PATH=/usr/local/go/bin:${PATH}
 ARG PULUMI_VERSION=3.83.0
 RUN curl -fsSL https://get.pulumi.com \
@@ -63,6 +63,28 @@ RUN export targetarch="${TARGETARCH}" \
     && chmod +x ./bicep \
     && mv ./bicep /usr/local/bin/bicep \
     && bicep --version
+
+FROM base as rust
+ARG TARGETARCH
+SHELL [ "/bin/bash", "--login", "-e", "-o", "pipefail", "-c" ]
+ARG RUSTUP_HOME=/etc/skel/.rustup
+ARG CARGO_HOME=/etc/skel/.cargo
+ENV PATH=${CARGO_HOME}/bin:${PATH}
+ARG CARGO_PACKAGES
+RUN apt-get -y update \
+    && apt-get -y install --no-install-recommends \
+        jq \
+    && curl -fsSL https://sh.rustup.rs | sh -s -- -y \
+        --default-toolchain=stable \
+        --profile=minimal \
+        --no-modify-path \
+    && rustup --version \
+    && cargo --version \
+    && rustc --version \
+    && rustup component add rustfmt clippy \
+    && cargo_tools=() \
+    && while IFS='' read -r pkg; do cargo_tools+=("$pkg"); done < <(printf "%s\n" "${CARGO_PACKAGES}" | jq -r '.[]') \
+    && cargo install "${cargo_tools[@]}"
 
 FROM base as act-base
 
@@ -292,7 +314,6 @@ RUN dotnet tool install \
     && ln -s "$(realpath --relative-to=/usr/local/bin "${TOOL_PATH_PWSH}")/pwsh" /usr/local/bin/pwsh \
     && chmod 755 "${TOOL_PATH_PWSH}/pwsh" \
     && [[ "$(pwsh --version)" =~ ${POWERSHELL_VERSION} ]]
-#     && pwsh -NonInteractive -Command "Install-PackageProvider -Name NuGet -MinimumVersion '2.8.5.201' -Force -Scope AllUsers" \
 
 # kics-scan ignore-line
 FROM act-powershell as act-powershell-modules
@@ -323,24 +344,36 @@ SHELL [ "/bin/bash", "--login", "-e", "-o", "pipefail", "-c" ]
 WORKDIR /tmp
 
 # add go
-COPY --from=golang /usr/local/go /usr/local/go
+COPY --link --from=golang /usr/local/go /usr/local/go
 ENV PATH=/usr/local/go/bin:${PATH}
 RUN sed "s|^PATH=|PATH=/usr/local/go/bin:|mg" -i /etc/environment
 
 # add pulumi
-COPY --from=pulumi /root/.pulumi/bin /usr/local/bin/
+COPY --link --from=pulumi /root/.pulumi/bin /usr/local/bin/
 
 # add bicep
-COPY --from=bicep /usr/local/bin/bicep /usr/local/bin/bicep
+COPY --link --from=bicep /usr/local/bin/bicep /usr/local/bin/bicep
+
+# add rust
+ARG CARGO_HOME=/etc/skel/.cargo
+COPY --link --from=rust ${CARGO_HOME} ${CARGO_HOME}
+ARG RUSTUP_HOME=/etc/skel/.rustup
+COPY --link --from=rust ${RUSTUP_HOME} ${RUSTUP_HOME}
+ENV PATH=${CARGO_HOME}/bin:${PATH} \
+    CARGO_HOME=${CARGO_HOME} \
+    RUSTUP_HOME=${RUSTUP_HOME}
+RUN sed "s|^PATH=|PATH=${CARGO_HOME}/bin:|mg" -i /etc/environment \
+    && echo "CARGO_HOME=${CARGO_HOME}" | tee -a /etc/environment \
+    && echo "RUSTUP_HOME=${RUSTUP_HOME}" | tee -a /etc/environment
 
 # add PowerShell
 ARG TOOL_PATH_PWSH=/usr/share/powershell
-COPY --from=act-powershell ${TOOL_PATH_PWSH} ${TOOL_PATH_PWSH}
+COPY --link --from=act-powershell ${TOOL_PATH_PWSH} ${TOOL_PATH_PWSH}
 RUN ln -s "$(realpath --relative-to=/usr/local/bin "${TOOL_PATH_PWSH}")/pwsh" /usr/local/bin/pwsh
 
 # add  PowerShell-modules
-COPY --from=act-powershell-modules /usr/local/share/powershell /usr/local/share/powershell
-COPY --from=act-powershell-az-modules /usr/local/share/powershell /usr/local/share/powershell
+COPY --link --from=act-powershell-modules /usr/local/share/powershell /usr/local/share/powershell
+COPY --link --from=act-powershell-az-modules /usr/local/share/powershell /usr/local/share/powershell
 
 ARG RUNNER
 USER ${RUNNER}
