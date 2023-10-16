@@ -118,28 +118,16 @@ RUN bash -c "$(curl -fsSL https://raw.githubusercontent.com/ilikenwf/apt-fast/ma
     && rm -rf /etc/apt/sources.list.d/* \
     && rm -rf /var/lib/apt/lists/*
 
-ARG FROM_VERSION=22.04
-FROM buildpack-deps:${FROM_VERSION} as rust
+FROM base as rust
 ARG TARGETARCH
 SHELL [ "/bin/bash", "--login", "-e", "-o", "pipefail", "-c" ]
 ARG RUSTUP_HOME=/etc/skel/.rustup
 ARG CARGO_HOME=/etc/skel/.cargo
 ENV PATH=${CARGO_HOME}/bin:${PATH}
-ARG CARGO_PACKAGES
-RUN apt-get -y update \
-    && apt-get -y install --no-install-recommends \
-        jq \
-    && curl -fsSL https://sh.rustup.rs | sh -s -- -y \
-        --default-toolchain=stable \
-        --profile=complete \
-        --no-modify-path \
-        --component rustfmt clippy \
-    && cargo_tools=() \
-    && while IFS='' read -r pkg; do cargo_tools+=("$pkg"); done < <(printf "%s\n" "${CARGO_PACKAGES}" | jq -r '.[]') \
-    && cargo install "${cargo_tools[@]}" \
-    && apt-get clean \
-    && rm -rf /etc/apt/sources.list.d/* \
-    && rm -rf /var/lib/apt/lists/*
+RUN curl -fsSL https://sh.rustup.rs | sh -s -- -y \
+    --default-toolchain=stable \
+    && cargo --version \
+    && rustc --version
 
 FROM base as golang
 ARG TARGETARCH
@@ -332,6 +320,18 @@ RUN apt-get -y update &>/dev/null \
     && rm -rf /etc/apt/sources.list.d/* \
     && rm -rf /var/lib/apt/lists/*
 
+# add rust
+ARG CARGO_HOME=/etc/skel/.cargo
+COPY --link --from=rust ${CARGO_HOME} ${CARGO_HOME}
+ARG RUSTUP_HOME=/etc/skel/.rustup
+COPY --link --from=rust ${RUSTUP_HOME} ${RUSTUP_HOME}
+ENV PATH=${CARGO_HOME}/bin:${PATH} \
+    CARGO_HOME=${CARGO_HOME} \
+    RUSTUP_HOME=${RUSTUP_HOME}
+RUN sed "s|^PATH=|PATH=${CARGO_HOME}/bin:|mg" -i /etc/environment \
+    && echo "CARGO_HOME=${CARGO_HOME}" | tee -a /etc/environment \
+    && echo "RUSTUP_HOME=${RUSTUP_HOME}" | tee -a /etc/environment
+
 # add go
 COPY --link --from=golang /usr/local/go /usr/local/go
 ENV PATH=/usr/local/go/bin:${PATH}
@@ -351,18 +351,6 @@ RUN ln -s "$(realpath --relative-to=/usr/local/bin "${TOOL_PATH_PWSH}")/pwsh" /u
 # add  PowerShell-modules
 COPY --link --from=dotnet-powershell-modules /usr/local/share/powershell /usr/local/share/powershell
 COPY --link --from=dotnet-powershell-az-modules /usr/local/share/powershell /usr/local/share/powershell
-
-# add rust
-ARG CARGO_HOME=/etc/skel/.cargo
-COPY --link --from=rust ${CARGO_HOME} ${CARGO_HOME}
-ARG RUSTUP_HOME=/etc/skel/.rustup
-COPY --link --from=rust ${RUSTUP_HOME} ${RUSTUP_HOME}
-ENV PATH=${CARGO_HOME}/bin:${PATH} \
-    CARGO_HOME=${CARGO_HOME} \
-    RUSTUP_HOME=${RUSTUP_HOME}
-RUN sed "s|^PATH=|PATH=${CARGO_HOME}/bin:|mg" -i /etc/environment \
-    && echo "CARGO_HOME=${CARGO_HOME}" | tee -a /etc/environment \
-    && echo "RUSTUP_HOME=${RUSTUP_HOME}" | tee -a /etc/environment
 
 # upgrade and cleanup step
 RUN apt-get -y update \
