@@ -1,7 +1,11 @@
 # syntax=docker/dockerfile:1
 # kics-scan disable=e36d8880-3f78-4546-b9a1-12f0745ca0d5,965a08d7-ef86-4f14-8792-4a3b2098937e,77783205-c4ca-4f80-bb80-c777f267c547,0008c003-79aa-42d8-95b8-1c2fe37dbfe6
+
 ARG FROM_VERSION=22.04
 FROM buildpack-deps:${FROM_VERSION} as base
+
+ARG TARGETARCH
+SHELL [ "/bin/bash", "--login", "-e", "-o", "pipefail", "-c" ]
 
 # Force apt to not be interactive/not ask
 ENV DEBIAN_FRONTEND=noninteractive
@@ -27,76 +31,6 @@ ENV LANG=${language}.utf8 \
     LC_ALL=${language}.utf8 \
     RUNNER_MANUALLY_TRAP_SIG=1 \
     ACTIONS_RUNNER_PRINT_LOG_TO_STDOUT=1
-
-FROM base as golang
-ARG TARGETARCH
-SHELL [ "/bin/bash", "--login", "-e", "-o", "pipefail", "-c" ]
-ENV PATH=/usr/local/go/bin:${PATH}
-ARG GOLANG_SHA256_amd64=cc97c28d9c252fbf28f91950d830201aa403836cbed702a05932e63f7f0c7bc4
-ARG GOLANG_SHA256_arm64=15ab379c6a2b0d086fe3e74be4599420e66549edf7426a300ee0f3809500f89e
-ARG GOLANG_VERSION=1.20.8
-RUN mkdir -p /tmp/go \
-    && curl -fsSL https://golang.org/dl/go"${GOLANG_VERSION}".linux-"${TARGETARCH}".tar.gz -o /tmp/go.tgz \
-    && go_sha="${go_sha=GOLANG_SHA256_${TARGETARCH}}" \
-    && echo "${!go_sha} /tmp/go.tgz" | sha256sum -c - \
-    && tar -C /usr/local -xzf /tmp/go.tgz \
-    && rm /tmp/go.tgz \
-    && [[ $(go version) =~ ${GOLANG_VERSION} ]]
-
-FROM base as pulumi
-ARG TARGETARCH
-SHELL [ "/bin/bash", "--login", "-e", "-o", "pipefail", "-c" ]
-COPY --link --from=golang /usr/local/go /usr/local/go
-ENV PATH=/usr/local/go/bin:${PATH}
-ARG PULUMI_VERSION=3.83.0
-RUN curl -fsSL https://get.pulumi.com \
-    | sh -s -- --version "${PULUMI_VERSION}" \
-    && export PATH="$HOME/.pulumi/bin:$PATH" \
-    && pulumi version
-
-FROM base as bicep
-ARG TARGETARCH
-ARG BICEP_VERSION=v0.21.1
-RUN export targetarch="${TARGETARCH}" \
-    && if [ "${targetarch}" = "amd64" ]; then export targetarch="x64"; fi \
-    && curl -sSLo bicep "https://github.com/Azure/bicep/releases/download/${BICEP_VERSION}/bicep-linux-${targetarch}" \
-    && chmod +x ./bicep \
-    && mv ./bicep /usr/local/bin/bicep \
-    && bicep --version
-
-FROM base as rust
-ARG TARGETARCH
-SHELL [ "/bin/bash", "--login", "-e", "-o", "pipefail", "-c" ]
-ARG RUSTUP_HOME=/etc/skel/.rustup
-ARG CARGO_HOME=/etc/skel/.cargo
-ENV PATH=${CARGO_HOME}/bin:${PATH}
-ARG CARGO_PACKAGES
-RUN apt-get -y update \
-    && apt-get -y install --no-install-recommends \
-        jq \
-    && curl -fsSL https://sh.rustup.rs | sh -s -- -y \
-        --default-toolchain=stable \
-        --profile=minimal \
-        --no-modify-path \
-    && rustup --version \
-    && cargo --version \
-    && rustc --version \
-    && rustup component add rustfmt clippy \
-    && cargo_tools=() \
-    && while IFS='' read -r pkg; do cargo_tools+=("$pkg"); done < <(printf "%s\n" "${CARGO_PACKAGES}" | jq -r '.[]') \
-    && cargo install "${cargo_tools[@]}" \
-    && apt-get clean \
-    && rm -rf /etc/apt/sources.list.d/* \
-    && rm -rf /var/lib/apt/lists/*
-
-FROM base as act-base
-
-# automatic buildx ARGs
-ARG TARGETARCH
-
-# enable pipefail and set workdir
-SHELL [ "/bin/bash", "--login", "-e", "-o", "pipefail", "-c" ]
-WORKDIR /tmp
 
 # setup environment
 ENV AGENT_TOOLSDIRECTORY=/opt/hostedtoolcache \
@@ -132,53 +66,12 @@ RUN ssh-keyscan github.com >>/etc/ssh/ssh_known_hosts \
 # Install dependencies
 ARG DEPENDENCIES
 RUN apt-get -y update &>/dev/null \
-    && apt-get -y install --no-install-recommends jq \
+    && apt-get -y install --no-install-recommends \
+        jq \
     && packages=() \
     && while IFS='' read -r pkg; do packages+=("$pkg"); done < <(printf "%s\n" "${DEPENDENCIES}" | jq -r '.[]') \
     && apt-get -y install --no-install-recommends \
         "${packages[@]}" \
-    && apt-get clean \
-    && rm -rf /etc/apt/sources.list.d/* \
-    && rm -rf /var/lib/apt/lists/*
-
-# Install apt-fast
-RUN bash -c "$(curl -fsSL https://raw.githubusercontent.com/ilikenwf/apt-fast/master/quick-install.sh)" \
-    && apt-get -y upgrade \
-    && apt-get clean \
-    && rm -rf /etc/apt/sources.list.d/* \
-    && rm -rf /var/lib/apt/lists/*
-
-# Install current version of git
-# hadolint ignore=SC2035
-RUN add-apt-repository -y ppa:git-core/ppa \
-    && apt-get -y update &>/dev/null \
-    && apt-get -y install --no-install-recommends \
-        git \
-    && printf "[safe]\n\tdirectory = *\n" | tee -a /etc/gitconfig \
-    && apt-get clean \
-    && rm -rf /etc/apt/sources.list.d/* \
-    && rm -rf /var/lib/apt/lists/*
-
-# Install Git-LFS
-RUN curl -sSL https://packagecloud.io/install/repositories/github/git-lfs/script.deb.sh | bash \
-    && apt-get -y install --no-install-recommends \
-        git-lfs \
-    && apt-get clean \
-    && rm -rf /etc/apt/sources.list.d/* \
-    && rm -rf /var/lib/apt/lists/*
-
-# Install docker cli
-RUN echo "deb https://packages.microsoft.com/ubuntu/$(lsb_release -rs)/prod $(lsb_release -cs) main" \
-    | tee /etc/apt/sources.list.d/microsoft-prod.list \
-    && curl -fsSL https://packages.microsoft.com/keys/microsoft.asc \
-    | gpg --dearmour -o /etc/apt/trusted.gpg.d/microsoft.gpg \
-    && apt-get -y update &>/dev/null \
-    && apt-get -y install --no-install-recommends \
-        moby-cli \
-        moby-buildx \
-        moby-compose \
-    && docker -v \
-    && docker buildx version \
     && apt-get clean \
     && rm -rf /etc/apt/sources.list.d/* \
     && rm -rf /var/lib/apt/lists/*
@@ -214,6 +107,141 @@ RUN printf "Package: *net*\nPin: origin packages.microsoft.com\nPin-Priority: 10
         --version "${DOTNET_SDK_VERSION}" \
     && rm -rf /etc/apt/preferences.d/dotnet \
     && sed "s|^PATH=|PATH=${DOTNET_ROOT}:|mg" -i /etc/environment \
+    && apt-get clean \
+    && rm -rf /etc/apt/sources.list.d/* \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install apt-fast
+RUN bash -c "$(curl -fsSL https://raw.githubusercontent.com/ilikenwf/apt-fast/master/quick-install.sh)" \
+    && apt-get -y upgrade \
+    && apt-get clean \
+    && rm -rf /etc/apt/sources.list.d/* \
+    && rm -rf /var/lib/apt/lists/*
+
+FROM base as rust
+ARG TARGETARCH
+SHELL [ "/bin/bash", "--login", "-e", "-o", "pipefail", "-c" ]
+ARG RUSTUP_HOME=/etc/skel/.rustup
+ARG CARGO_HOME=/etc/skel/.cargo
+ENV PATH=${CARGO_HOME}/bin:${PATH}
+RUN curl -fsSL https://sh.rustup.rs | sh -s -- -y \
+    --default-toolchain=stable \
+    && cargo --version \
+    && rustc --version
+
+FROM base as golang
+ARG TARGETARCH
+SHELL [ "/bin/bash", "--login", "-e", "-o", "pipefail", "-c" ]
+ENV PATH=/usr/local/go/bin:${PATH}
+ARG GOLANG_SHA256_amd64=cc97c28d9c252fbf28f91950d830201aa403836cbed702a05932e63f7f0c7bc4
+ARG GOLANG_SHA256_arm64=15ab379c6a2b0d086fe3e74be4599420e66549edf7426a300ee0f3809500f89e
+ARG GOLANG_VERSION=1.20.8
+RUN mkdir -p /tmp/go \
+    && curl -fsSL https://golang.org/dl/go"${GOLANG_VERSION}".linux-"${TARGETARCH}".tar.gz -o /tmp/go.tgz \
+    && go_sha="${go_sha=GOLANG_SHA256_${TARGETARCH}}" \
+    && echo "${!go_sha} /tmp/go.tgz" | sha256sum -c - \
+    && tar -C /usr/local -xzf /tmp/go.tgz \
+    && rm /tmp/go.tgz \
+    && [[ $(go version) =~ ${GOLANG_VERSION} ]]
+
+FROM base as pulumi
+ARG TARGETARCH
+SHELL [ "/bin/bash", "--login", "-e", "-o", "pipefail", "-c" ]
+ARG PULUMI_VERSION=3.83.0
+RUN curl -fsSL https://get.pulumi.com \
+    | sh -s -- --version "${PULUMI_VERSION}" \
+    && export PATH="$HOME/.pulumi/bin:$PATH" \
+    && pulumi version
+
+FROM base as bicep
+ARG TARGETARCH
+ARG BICEP_VERSION=v0.21.1
+RUN export targetarch="${TARGETARCH}" \
+    && if [ "${targetarch}" = "amd64" ]; then export targetarch="x64"; fi \
+    && curl -sSLo bicep "https://github.com/Azure/bicep/releases/download/${BICEP_VERSION}/bicep-linux-${targetarch}" \
+    && chmod +x ./bicep \
+    && mv ./bicep /usr/local/bin/bicep \
+    && bicep --version
+
+FROM base as dotnet-powershell
+SHELL [ "/bin/bash", "--login", "-e", "-o", "pipefail", "-c" ]
+# Install PowerShell global tool
+ARG TARGETARCH
+ARG POWERSHELL_VERSION=7.2.13
+ARG TOOL_PATH_PWSH=/usr/share/powershell
+RUN dotnet tool install \
+    --tool-path "${TOOL_PATH_PWSH}" \
+    --version "${POWERSHELL_VERSION}" \
+    PowerShell \
+    && find "${TOOL_PATH_PWSH}" -print | grep -i '.*[.]nupkg$' | xargs rm \
+    && ln -s "$(realpath --relative-to=/usr/local/bin "${TOOL_PATH_PWSH}")/pwsh" /usr/local/bin/pwsh \
+    && chmod 755 "${TOOL_PATH_PWSH}/pwsh" \
+    && [[ "$(pwsh --version)" =~ ${POWERSHELL_VERSION} ]]
+
+FROM base as dotnet-powershell-modules
+ARG TARGETARCH
+SHELL [ "/bin/bash", "--login", "-e", "-o", "pipefail", "-c" ]
+ARG TOOL_PATH_PWSH=/usr/share/powershell
+COPY --link --from=dotnet-powershell ${TOOL_PATH_PWSH} ${TOOL_PATH_PWSH}
+RUN ln -s "$(realpath --relative-to=/usr/local/bin "${TOOL_PATH_PWSH}")/pwsh" /usr/local/bin/pwsh
+ARG POWERSHELL_MODULES
+RUN pwsh -NonInteractive -Command "Set-PSRepository -Name PSGallery -InstallationPolicy Trusted" \
+    && while IFS='' read -r pwshModule; do echo "installing ${pwshModule}" \
+        && pwsh -NonInteractive -Command "Install-Module -Name ${pwshModule} -Scope AllUsers -Repository PSGallery"; done \
+        < <(printf "%s\n" "${POWERSHELL_MODULES}" | jq -r '.[]')
+
+FROM base as dotnet-powershell-az-modules
+ARG TARGETARCH
+SHELL [ "/bin/bash", "--login", "-e", "-o", "pipefail", "-c" ]
+ARG TOOL_PATH_PWSH=/usr/share/powershell
+COPY --link --from=dotnet-powershell ${TOOL_PATH_PWSH} ${TOOL_PATH_PWSH}
+RUN ln -s "$(realpath --relative-to=/usr/local/bin "${TOOL_PATH_PWSH}")/pwsh" /usr/local/bin/pwsh
+ARG POWERSHELL_AZ_MODULE_VERSIONS
+RUN pwsh -NonInteractive -Command "Set-PSRepository -Name PSGallery -InstallationPolicy Trusted" \
+    && while IFS='' read -r azVersion; do echo "installing Az ${azVersion}" \
+        && pwsh -NonInteractive -Command "Install-Module -Name Az -RequiredVersion ${azVersion} -Scope AllUsers -Repository PSGallery"; done \
+        < <(printf "%s\n" "${POWERSHELL_AZ_MODULE_VERSIONS}" | jq -r '.[]')
+
+FROM base as act
+
+# automatic buildx ARGs
+ARG TARGETARCH
+
+# enable pipefail and set workdir
+SHELL [ "/bin/bash", "--login", "-e", "-o", "pipefail", "-c" ]
+WORKDIR /tmp
+
+# Install current version of git
+# hadolint ignore=SC2035
+RUN add-apt-repository -y ppa:git-core/ppa \
+    && apt-get -y update &>/dev/null \
+    && apt-get -y install --no-install-recommends \
+        git \
+    && printf "[safe]\n\tdirectory = *\n" | tee -a /etc/gitconfig \
+    && apt-get clean \
+    && rm -rf /etc/apt/sources.list.d/* \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Git-LFS
+RUN curl -sSL https://packagecloud.io/install/repositories/github/git-lfs/script.deb.sh | bash \
+    && apt-get -y install --no-install-recommends \
+        git-lfs \
+    && apt-get clean \
+    && rm -rf /etc/apt/sources.list.d/* \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install docker cli
+RUN echo "deb https://packages.microsoft.com/ubuntu/$(lsb_release -rs)/prod $(lsb_release -cs) main" \
+    | tee /etc/apt/sources.list.d/microsoft-prod.list \
+    && curl -fsSL https://packages.microsoft.com/keys/microsoft.asc \
+    | gpg --dearmour -o /etc/apt/trusted.gpg.d/microsoft.gpg \
+    && apt-get -y update &>/dev/null \
+    && apt-get -y install --no-install-recommends \
+        moby-cli \
+        moby-buildx \
+        moby-compose \
+    && docker -v \
+    && docker buildx version \
     && apt-get clean \
     && rm -rf /etc/apt/sources.list.d/* \
     && rm -rf /var/lib/apt/lists/*
@@ -292,71 +320,6 @@ RUN apt-get -y update &>/dev/null \
     && rm -rf /etc/apt/sources.list.d/* \
     && rm -rf /var/lib/apt/lists/*
 
-# cleanup step
-RUN apt-get -y clean \
-    && rm -rf \
-        /var/cache/* \
-        /var/log/* \
-        /var/lib/apt/lists/* \
-        /etc/apt/sources.list.d/* \
-        /tmp/* \
-    || echo 'Failed to delete directories'
-
-# kics-scan ignore-line
-FROM act-base as act-powershell
-SHELL [ "/bin/bash", "--login", "-e", "-o", "pipefail", "-c" ]
-# Install PowerShell global tool
-ARG TARGETARCH
-ARG POWERSHELL_VERSION=7.2.13
-ARG TOOL_PATH_PWSH=/usr/share/powershell
-RUN dotnet tool install \
-    --tool-path "${TOOL_PATH_PWSH}" \
-    --version "${POWERSHELL_VERSION}" \
-    PowerShell \
-    && find "${TOOL_PATH_PWSH}" -print | grep -i '.*[.]nupkg$' | xargs rm \
-    && ln -s "$(realpath --relative-to=/usr/local/bin "${TOOL_PATH_PWSH}")/pwsh" /usr/local/bin/pwsh \
-    && chmod 755 "${TOOL_PATH_PWSH}/pwsh" \
-    && [[ "$(pwsh --version)" =~ ${POWERSHELL_VERSION} ]]
-
-# kics-scan ignore-line
-FROM act-powershell as act-powershell-modules
-ARG TARGETARCH
-SHELL [ "/bin/bash", "--login", "-e", "-o", "pipefail", "-c" ]
-ARG POWERSHELL_MODULES
-# Trust PSGallery and install Powershell-/Azure Modules
-RUN pwsh -NonInteractive -Command "Set-PSRepository -Name PSGallery -InstallationPolicy Trusted" \
-    && while IFS='' read -r pwshModule; do echo "installing ${pwshModule}" \
-        && pwsh -NonInteractive -Command "Install-Module -Name ${pwshModule} -Scope AllUsers -Repository PSGallery"; done \
-        < <(printf "%s\n" "${POWERSHELL_MODULES}" | jq -r '.[]')
-
-# kics-scan ignore-line
-FROM act-powershell as act-powershell-az-modules
-ARG TARGETARCH
-SHELL [ "/bin/bash", "--login", "-e", "-o", "pipefail", "-c" ]
-ARG POWERSHELL_AZ_MODULE_VERSIONS
-# Trust PSGallery and install Powershell-/Azure Modules
-RUN pwsh -NonInteractive -Command "Set-PSRepository -Name PSGallery -InstallationPolicy Trusted" \
-    && while IFS='' read -r azVersion; do echo "installing Az ${azVersion}" \
-        && pwsh -NonInteractive -Command "Install-Module -Name Az -RequiredVersion ${azVersion} -Scope AllUsers -Repository PSGallery"; done \
-        < <(printf "%s\n" "${POWERSHELL_AZ_MODULE_VERSIONS}" | jq -r '.[]')
-
-# kics-scan ignore-line
-FROM act-base as act
-ARG TARGETARCH
-SHELL [ "/bin/bash", "--login", "-e", "-o", "pipefail", "-c" ]
-WORKDIR /tmp
-
-# add go
-COPY --link --from=golang /usr/local/go /usr/local/go
-ENV PATH=/usr/local/go/bin:${PATH}
-RUN sed "s|^PATH=|PATH=/usr/local/go/bin:|mg" -i /etc/environment
-
-# add pulumi
-COPY --link --from=pulumi /root/.pulumi/bin /usr/local/bin/
-
-# add bicep
-COPY --link --from=bicep /usr/local/bin/bicep /usr/local/bin/bicep
-
 # add rust
 ARG CARGO_HOME=/etc/skel/.cargo
 COPY --link --from=rust ${CARGO_HOME} ${CARGO_HOME}
@@ -369,14 +332,37 @@ RUN sed "s|^PATH=|PATH=${CARGO_HOME}/bin:|mg" -i /etc/environment \
     && echo "CARGO_HOME=${CARGO_HOME}" | tee -a /etc/environment \
     && echo "RUSTUP_HOME=${RUSTUP_HOME}" | tee -a /etc/environment
 
+# add go
+COPY --link --from=golang /usr/local/go /usr/local/go
+ENV PATH=/usr/local/go/bin:${PATH}
+RUN sed "s|^PATH=|PATH=/usr/local/go/bin:|mg" -i /etc/environment
+
+# add pulumi
+COPY --link --from=pulumi /root/.pulumi/bin /usr/local/bin/
+
+# add bicep
+COPY --link --from=bicep /usr/local/bin/bicep /usr/local/bin/bicep
+
 # add PowerShell
 ARG TOOL_PATH_PWSH=/usr/share/powershell
-COPY --link --from=act-powershell ${TOOL_PATH_PWSH} ${TOOL_PATH_PWSH}
+COPY --link --from=dotnet-powershell ${TOOL_PATH_PWSH} ${TOOL_PATH_PWSH}
 RUN ln -s "$(realpath --relative-to=/usr/local/bin "${TOOL_PATH_PWSH}")/pwsh" /usr/local/bin/pwsh
 
 # add  PowerShell-modules
-COPY --link --from=act-powershell-modules /usr/local/share/powershell /usr/local/share/powershell
-COPY --link --from=act-powershell-az-modules /usr/local/share/powershell /usr/local/share/powershell
+COPY --link --from=dotnet-powershell-modules /usr/local/share/powershell /usr/local/share/powershell
+COPY --link --from=dotnet-powershell-az-modules /usr/local/share/powershell /usr/local/share/powershell
+
+# upgrade and cleanup step
+RUN apt-get -y update \
+    && apt-get -y upgrade \
+    && apt-get -y clean \
+    && rm -rf \
+        /var/cache/* \
+        /var/log/* \
+        /var/lib/apt/lists/* \
+        /etc/apt/sources.list.d/* \
+        /tmp/* \
+    || echo 'Failed to delete directories'
 
 ARG RUNNER
 USER ${RUNNER}
