@@ -158,7 +158,7 @@ jobs:
 
       # Docker-Scout - Create SBOM
       # kics-scan ignore-line
-      - uses: docker/scout-action@914f29b95fa18690ce41fdee98cf892d78f8c5c0
+      - uses: docker/scout-action@4e9ac4df44fb56797da111fce8185f7fbffd5a09
         name: Create SBOM
         id: docker-scout-sbom
         continue-on-error: true
@@ -171,7 +171,7 @@ jobs:
 
       # vulnerability scan the image for main branch
       # kics-scan ignore-line
-      - uses: docker/scout-action@914f29b95fa18690ce41fdee98cf892d78f8c5c0
+      - uses: docker/scout-action@4e9ac4df44fb56797da111fce8185f7fbffd5a09
         name: Analyze for critical and high CVEs
         id: docker-scout-cves
         continue-on-error: true
@@ -193,7 +193,7 @@ jobs:
 
       # vulnerability scanning to verify PRs
       # kics-scan ignore-line
-      - uses: docker/scout-action@914f29b95fa18690ce41fdee98cf892d78f8c5c0
+      - uses: docker/scout-action@4e9ac4df44fb56797da111fce8185f7fbffd5a09
         name: Docker Scout compare
         id: pr-compare
         if: github.event_name == 'pull_request' && vars.DOCKERHUB_USERNAME != ''
