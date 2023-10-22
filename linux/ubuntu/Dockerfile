@@ -205,13 +205,9 @@ RUN KUBECTL_VERSION=$(curl -fsSL "https://dl.k8s.io/release/stable.txt") \
     && curl -sSL "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/${TARGETARCH}/kubectl" \
         -o "${PATH_LOCAL_BINS}/kubectl" \
     && chmod +x "${PATH_LOCAL_BINS}/kubectl" \
-    && kubectl version --client --output=yaml \
     && curl -sSL https://raw.githubusercontent.com/helm/helm/master/scripts/get-helm-3 | bash \
-    && helm version --client \
     && curl -sSL -O "https://storage.googleapis.com/minikube/releases/latest/minikube-linux-${TARGETARCH}" \
-    && install "minikube-linux-${TARGETARCH}" "${PATH_LOCAL_BINS}/minikube" \
-    && rm "minikube-linux-${TARGETARCH}" \
-    && minikube version
+    && install "minikube-linux-${TARGETARCH}" "${PATH_LOCAL_BINS}/minikube"
 
 FROM base as rust
 ARG TARGETARCH
