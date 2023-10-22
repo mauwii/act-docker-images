@@ -42,6 +42,18 @@ variable "DEPENDENCIES" {
   default = "[\"acl\",\"apt-transport-https\",\"aria2\",\"bison\",\"brotli\",\"dbus\",\"dnsutils\",\"fakeroot\",\"flex\",\"fonts-noto-color-emoji\",\"ftp\",\"gawk\",\"gnupg-agent\",\"gnupg2\",\"haveged\",\"iproute2\",\"iputils-ping\",\"libc++-dev\",\"libc++abi-dev\",\"libc6-dev\",\"libgbm-dev\",\"libgconf-2-4\",\"libgsl-dev\",\"libgtk-3-0\",\"libmagic-dev\",\"libsecret-1-dev\",\"libssl-dev\",\"libunwind8\",\"libxkbfile-dev\",\"libxss1\",\"libyaml-dev\",\"lz4\",\"mediainfo\",\"net-tools\",\"netcat\",\"p7zip-full\",\"p7zip-rar\",\"parallel\",\"pass\",\"patchelf\",\"pigz\",\"pollinate\",\"python-is-python3\",\"rpm\",\"rsync\",\"shellcheck\",\"software-properties-common\",\"sphinxsearch\",\"sqlite3\",\"ssh\",\"sshpass\",\"subversion\",\"sudo\",\"swig\",\"telnet\",\"texinfo\",\"time\",\"tk\",\"unzip\",\"upx\",\"xorriso\",\"xvfb\",\"xz-utils\",\"zip\",\"zstd\",\"zsync\"]"
 }
 
+variable "GIT_LFS_SHA256_amd64" {
+  default = "60b7e9b9b4bca04405af58a2cd5dff3e68a5607c5bc39ee88a5256dd7a07f58c"
+}
+
+variable "GIT_LFS_SHA256_arm64" {
+  default = "aee90114f8f2eb5a11c1a6e9f1703a2bfcb4dc1fc4ba12a3a574c3a86952a5d0"
+}
+
+variable "GIT_LFS_VERSION" {
+  default = "3.4.0"
+}
+
 variable "GOLANG_SHA256_amd64" {
   default = "8921369701afa749b07232d2c34d514510c32dbfd79c65adb379451b5f0d7216"
 }
@@ -59,7 +71,7 @@ variable "NODE_VERSION" {
 }
 
 variable "PULUMI_VERSION" {
-  default = "3.87.0"
+  default = "3.89.0"
 }
 
 variable "POWERSHELL_AZ_MODULE_VERSIONS" {
@@ -86,7 +98,7 @@ target "ubuntu" {
         codename           = "jammy"
         DOTNET_CHANNEL     = "LTS"
         DOTNET_DEPS        = "[\"libicu70\",\"libssl3\",\"libunwind8\",\"libgcc-s1\",\"liblttng-ust1\"]"
-        DOTNET_SDK_VERSION = "6.0.415"
+        DOTNET_SDK_VERSION = "latest"
         POWERSHELL_VERSION = "7.2.13"
       },
       {
@@ -94,7 +106,7 @@ target "ubuntu" {
         codename           = "focal"
         DOTNET_CHANNEL     = "LTS"
         DOTNET_DEPS        = "[\"libicu66\",\"libssl1.1\"]"
-        DOTNET_SDK_VERSION = "6.0.415"
+        DOTNET_SDK_VERSION = "latest"
         POWERSHELL_VERSION = "7.2.13"
       }
     ]
@@ -108,10 +120,15 @@ target "ubuntu" {
     DOTNET_DEPS                   = release.DOTNET_DEPS
     DOTNET_SDK_VERSION            = release.DOTNET_SDK_VERSION
     FROM_VERSION                  = release.version
+    GIT_LFS_SHA256_amd64          = GIT_LFS_SHA256_amd64
+    GIT_LFS_SHA256_arm64          = GIT_LFS_SHA256_arm64
+    GIT_LFS_VERSION               = GIT_LFS_VERSION
     GOLANG_SHA256_amd64           = GOLANG_SHA256_amd64
     GOLANG_SHA256_arm64           = GOLANG_SHA256_arm64
     GOLANG_VERSION                = GOLANG_VERSION
+    LANGUAGE                      = "en_US"
     NODE_VERSION                  = NODE_VERSION
+    PATH_LOCAL_BINS               = "/usr/local/bin"
     POWERSHELL_AZ_MODULE_VERSIONS = POWERSHELL_AZ_MODULE_VERSIONS
     POWERSHELL_MODULES            = POWERSHELL_MODULES
     POWERSHELL_VERSION            = release.POWERSHELL_VERSION
