@@ -1,32 +1,32 @@
 # 🐳 Docker images for [nektos/act](https://github.com/nektos/act)
 
-[![Docker Pulls](https://badgen.net/docker/pulls/mauwii/ubuntu-act?icon=docker&label=pulls)][dockerHub]
-[![Docker Image Size](https://badgen.net/docker/size/mauwii/ubuntu-act?icon=docker&label=image%20size)][dockerHub]
-[![Docker Stars](https://badgen.net/docker/stars/mauwii/ubuntu-act?icon=docker&label=stars)][dockerHub]
-[![Github stars](https://badgen.net/github/stars/mauwii/act-docker-images?icon=github&label=stars)][githubRepo]
-[![Github forks](https://badgen.net/github/forks/mauwii/act-docker-images?icon=github&label=forks)][githubFork]
-[![Github issues](https://badgen.net/github/issues/mauwii/act-docker-images/?icon=github&label=issues)][githubIssues]
-[![Github last-commit](https://badgen.net/github/last-commit/mauwii/act-docker-images/?color=blue&icon=github&label=last-commit)][githubCommits]
+[![Docker Pulls][DockerHub-pulls-badge]][DockerHub]
+[![Docker Image Size][DockerHub-size-badge]][DockerHub]
+[![Docker Stars][DockerHub-stars-badge]][DockerHub]
+[![Github stars][GitHub-stars-badge]][GitHub-Repo]
+[![Github forks][GitHub-forks-badge]][GitHub-Fork]
+[![Github issues][GitHub-issues-badge]][GitHub-Issues]
+[![Github last-commit][GitHub-commit-badge]][GitHub-Commits]
 
-[![ci](https://github.com/mauwii/act-docker-images/actions/workflows/ci.yml/badge.svg?branch=main&event=push)][workflowCi]
-[![MegaLinter](https://github.com/mauwii/act-docker-images/workflows/MegaLinter/badge.svg?branch=main&event=push)][workflowMegaLinter]
-[![Docker-Hub description](https://github.com/mauwii/act-docker-images/actions/workflows/dockerhub-description.yml/badge.svg?branch=main)][workflowDhDesc]
+[![ci workflow badge][ci-badge]][Workflow-ci] [![MegaLinter][MegaLinter-badge]][Workflow-MegaLinter]
+[![Docker-Hub description workflow badge][Docker-Hub-description-badge]][Workflow-DockerHubDescription]
+[![Mergify badge][mergify-badge]][mergify] [![License badge][License-badge]][License]
 
 > [!WARNING]  
 > Heavily under construction, so please do not use this anywhere in production
 
 ## What
 
-The docker images in this repository are made to be used with [nektos/act][nektosActRepo], which is
-a very handy tool to execute github workflows locally.
+The docker images in this repository are made to be used with [nektos/act][nektos-act-repo], which
+is a very handy tool to execute github workflows locally.
 
 If you don't know it yet, I highly recommend to check it out 🤓
 
 ## Why
 
 In the other Images I had problems with executing azure related tools, so I decided to create my own
-image which is heavily inspired by the images of [catthehacker][catthehackerImages] and the
-[official runner images][actionsRunnerImages].
+image which is heavily inspired by the images of [catthehacker][catthehacker-image-repo] and the
+[official runner images][actions-runner-images].
 
 ## How to use
 
@@ -41,7 +41,7 @@ The easiest way is to add those lines in your `~/.actrc`:
 -P ubuntu-20.04=mauwii/ubuntu-act:20.04
 ```
 
-For further information about [nektos/act][nektosActRepo] and how to use it, take a 👀 at the
+For further information about [nektos/act][nektos-act-repo] and how to use it, take a 👀 at the
 [nektos documentation📖][nektosDocs]
 
 ## How I run act on my M2-Max 💻
@@ -170,23 +170,51 @@ would be via pipx.
 After successfully installing pre-commit on your system, you need to run `pre-commit install` in the
 repository root if you want to enable the pre-commit hooks on your system as well.
 
-[dockerHub]: https://hub.docker.com/r/mauwii/ubuntu-act/ "DockerHub container repository"
-[githubRepo]: https://github.com/mauwii/act-docker-images/ "GitHub repository"
-[githubFork]: https://github.com/mauwii/act-docker-images/fork/ "GitHub repository - forks"
-[githubIssues]: https://github.com/mauwii/act-docker-images/issues/ "GitHub repository - issues"
-[githubCommits]: https://github.com/mauwii/act-docker-images/commits/ "GitHub repository - commits"
-[workflowCi]:
-  https://github.com/mauwii/act-docker-images/actions/workflows/ci.yml
-  "GitHub workflow - ci"
-[workflowDhDesc]:
-  https://github.com/mauwii/act-docker-images/actions/workflows/dockerhub-description.yml
-  "DockerHub Description Workflow"
-[workflowMegaLinter]:
-  https://github.com/mauwii/act-docker-images/actions?query=workflow%3AMegaLinter+branch%3Amain
-  "MegaLinter Workflow"
-[nektosActRepo]: https://github.com/nektos/act "nektos/act git repository"
+<!-- links -->
+
+[DockerHub]: https://hub.docker.com/r/mauwii/ubuntu-act/ "DockerHub container repository"
+[GitHub-Repo]: https://github.com/mauwii/act-docker-images/ "GitHub repository"
+[GitHub-Fork]: https://github.com/mauwii/act-docker-images/fork/ "GitHub repository - forks"
+[GitHub-Issues]: https://github.com/mauwii/act-docker-images/issues/ "GitHub repository - issues"
+[GitHub-Commits]: https://github.com/mauwii/act-docker-images/commits/ "GitHub repository - commits"
+[License]: https://github.com/mauwii/act-docker-images/blob/main/LICENSE "License"
+[nektos-act-repo]: https://github.com/nektos/act "nektos/act git repository"
 [nektosDocs]: https://nektosact.com/beginner/index.html "nektos/act docs"
-[catthehackerImages]:
+[catthehacker-image-repo]:
   https://github.com/catthehacker/docker_images
   "catthehacker/docker_images repo"
-[actionsRunnerImages]: https://github.com/actions/runner-images "official GitHub Runner images"
+[actions-runner-images]: https://github.com/actions/runner-images "official GitHub Runner images"
+[Workflow-ci]:
+  https://github.com/mauwii/act-docker-images/actions/workflows/ci.yml
+  "GitHub workflow - ci"
+[Workflow-DockerHubDescription]:
+  https://github.com/mauwii/act-docker-images/actions/workflows/dockerhub-description.yml
+  "GitHub workflow - DockerHub Description"
+[Workflow-MegaLinter]:
+  https://github.com/mauwii/act-docker-images/actions?query=workflow%3AMegaLinter+branch%3Amain
+  "GitHub workflow - MegaLinter"
+[mergify]: https://mergify.com "Mergify.com"
+
+<!-- badges -->
+
+[mergify-badge]:
+  https://img.shields.io/endpoint.svg?url=https://api.mergify.com/v1/badges/mauwii/act-docker-images&style=flat
+[ci-badge]:
+  https://github.com/mauwii/act-docker-images/actions/workflows/ci.yml/badge.svg?branch=main&event=push
+[MegaLinter-badge]:
+  https://github.com/mauwii/act-docker-images/workflows/MegaLinter/badge.svg?branch=main&event=push
+[Docker-Hub-description-badge]:
+  https://github.com/mauwii/act-docker-images/actions/workflows/dockerhub-description.yml/badge.svg?branch=main
+[DockerHub-pulls-badge]: https://badgen.net/docker/pulls/mauwii/ubuntu-act?icon=docker&label=pulls
+[DockerHub-size-badge]:
+  https://badgen.net/docker/size/mauwii/ubuntu-act?icon=docker&label=image%20size
+[DockerHub-stars-badge]: https://badgen.net/docker/stars/mauwii/ubuntu-act?icon=docker&label=stars
+[GitHub-stars-badge]:
+  https://badgen.net/github/stars/mauwii/act-docker-images?icon=github
+[GitHub-forks-badge]:
+  https://badgen.net/github/forks/mauwii/act-docker-images?icon=github
+[GitHub-issues-badge]:
+  https://badgen.net/github/issues/mauwii/act-docker-images/?icon=github
+[GitHub-commit-badge]:
+  https://badgen.net/github/last-commit/mauwii/act-docker-images/main?icon=github&color=blue
+[License-badge]: https://badgen.net/github/license/mauwii/act-docker-images
