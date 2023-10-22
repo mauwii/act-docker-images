@@ -18,6 +18,7 @@
     "assumeyes",
     "automake",
     "azcliextensions",
+    "azcopy",
     "basepath",
     "binfmt",
     "binutils",

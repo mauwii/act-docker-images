@@ -1,7 +1,11 @@
 # syntax=docker/dockerfile:1
 # kics-scan disable=e36d8880-3f78-4546-b9a1-12f0745ca0d5,965a08d7-ef86-4f14-8792-4a3b2098937e,77783205-c4ca-4f80-bb80-c777f267c547,0008c003-79aa-42d8-95b8-1c2fe37dbfe6
 
-ARG FROM_VERSION=22.04
+##############
+# base-image #
+##############
+
+ARG FROM_VERSION
 FROM buildpack-deps:${FROM_VERSION} as base
 
 ARG TARGETARCH
@@ -14,7 +18,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 RUN echo "APT::Get::Assume-Yes \"true\";" >/etc/apt/apt.conf.d/90assumeyes
 
 # set locale
-ARG language=en_US
+ARG LANGUAGE=en_US
 RUN apt-get -y update >/dev/null \
     && apt-get -y install --no-install-recommends \
         locales \
@@ -22,13 +26,13 @@ RUN apt-get -y update >/dev/null \
     && rm -rf /etc/apt/sources.list.d/* \
     && rm -rf /var/lib/apt/lists/* \
     && localedef \
-        --inputfile="${language}" \
+        --inputfile="${LANGUAGE}" \
         --force \
         --charmap=UTF-8 \
-        --alias-file=/usr/share/locale/locale.alias "${language}.UTF-8"
-ENV LANG=${language}.utf8 \
-    LANGUAGE=${language} \
-    LC_ALL=${language}.utf8 \
+        --alias-file=/usr/share/locale/locale.alias "${LANGUAGE}.UTF-8"
+ENV LANG=${LANGUAGE}.utf8 \
+    LANGUAGE=${LANGUAGE} \
+    LC_ALL=${LANGUAGE}.utf8 \
     RUNNER_MANUALLY_TRAP_SIG=1 \
     ACTIONS_RUNNER_PRINT_LOG_TO_STDOUT=1
 
@@ -77,8 +81,8 @@ RUN apt-get -y update &>/dev/null \
     && rm -rf /var/lib/apt/lists/*
 
 # Set .NET related environment variables
-ARG DOTNET_SDK_VERSION=latest
-ARG DOTNET_CHANNEL=STS
+ARG DOTNET_SDK_VERSION
+ARG DOTNET_CHANNEL
 ARG DOTNET_DEPS
 ENV DOTNET_CLI_TELEMETRY_OPTOUT=1 \
     DOTNET_GENERATE_ASPNET_CERTIFICATE=false \
@@ -100,7 +104,8 @@ RUN printf "Package: *net*\nPin: origin packages.microsoft.com\nPin-Priority: 10
     && apt-get -y update &>/dev/null \
     && apt-get -y install --no-install-recommends \
         "${deps[@]}" \
-    && curl -fsSL https://dot.net/v1/dotnet-install.sh | bash -s -- \
+    && curl -fsSL https://dot.net/v1/dotnet-install.sh \
+    | bash -s -- \
         --install-dir "${DOTNET_ROOT}" \
         --no-path \
         --channel "${DOTNET_CHANNEL}" \
@@ -118,55 +123,115 @@ RUN bash -c "$(curl -fsSL https://raw.githubusercontent.com/ilikenwf/apt-fast/ma
     && rm -rf /etc/apt/sources.list.d/* \
     && rm -rf /var/lib/apt/lists/*
 
-FROM base as rust
-ARG TARGETARCH
-SHELL [ "/bin/bash", "--login", "-e", "-o", "pipefail", "-c" ]
-ARG RUSTUP_HOME=/etc/skel/.rustup
-ARG CARGO_HOME=/etc/skel/.cargo
-ENV PATH=${CARGO_HOME}/bin:${PATH}
-RUN curl -fsSL https://sh.rustup.rs | sh -s -- -y \
-    --default-toolchain=stable \
-    && cargo --version \
-    && rustc --version
+##################
+# download tools #
+##################
 
-FROM base as golang
+ARG FROM_VERSION
+FROM buildpack-deps:${FROM_VERSION} as golang
 ARG TARGETARCH
 SHELL [ "/bin/bash", "--login", "-e", "-o", "pipefail", "-c" ]
 ENV PATH=/usr/local/go/bin:${PATH}
-ARG GOLANG_SHA256_amd64=cc97c28d9c252fbf28f91950d830201aa403836cbed702a05932e63f7f0c7bc4
-ARG GOLANG_SHA256_arm64=15ab379c6a2b0d086fe3e74be4599420e66549edf7426a300ee0f3809500f89e
-ARG GOLANG_VERSION=1.20.8
+ARG GOLANG_SHA256_amd64
+ARG GOLANG_SHA256_arm64
+ARG GOLANG_VERSION
 RUN mkdir -p /tmp/go \
-    && curl -fsSL https://golang.org/dl/go"${GOLANG_VERSION}".linux-"${TARGETARCH}".tar.gz -o /tmp/go.tgz \
+    && curl -fsSL "https://golang.org/dl/go${GOLANG_VERSION}.linux-${TARGETARCH}.tar.gz" \
+        -o /tmp/go.tar.gz \
     && go_sha="${go_sha=GOLANG_SHA256_${TARGETARCH}}" \
-    && echo "${!go_sha} /tmp/go.tgz" | sha256sum -c - \
-    && tar -C /usr/local -xzf /tmp/go.tgz \
-    && rm /tmp/go.tgz \
+    && echo "${!go_sha} /tmp/go.tar.gz" | sha256sum -c - \
+    && tar -C /usr/local -xzf /tmp/go.tar.gz \
+    && rm /tmp/go.tar.gz \
     && [[ $(go version) =~ ${GOLANG_VERSION} ]]
 
-FROM base as pulumi
+ARG FROM_VERSION
+FROM buildpack-deps:${FROM_VERSION} as pulumi
 ARG TARGETARCH
 SHELL [ "/bin/bash", "--login", "-e", "-o", "pipefail", "-c" ]
-ARG PULUMI_VERSION=3.83.0
+ARG PULUMI_VERSION
 RUN curl -fsSL https://get.pulumi.com \
-    | sh -s -- --version "${PULUMI_VERSION}" \
+    | sh -s -- \
+        --version "${PULUMI_VERSION}" \
     && export PATH="$HOME/.pulumi/bin:$PATH" \
     && pulumi version
 
-FROM base as bicep
+ARG FROM_VERSION
+FROM buildpack-deps:${FROM_VERSION} as bicep
 ARG TARGETARCH
+ARG PATH_LOCAL_BINS
 ARG BICEP_VERSION=v0.21.1
 RUN export targetarch="${TARGETARCH}" \
     && if [ "${targetarch}" = "amd64" ]; then export targetarch="x64"; fi \
-    && curl -sSLo bicep "https://github.com/Azure/bicep/releases/download/${BICEP_VERSION}/bicep-linux-${targetarch}" \
-    && chmod +x ./bicep \
-    && mv ./bicep /usr/local/bin/bicep \
+    && curl -sSL "https://github.com/Azure/bicep/releases/download/${BICEP_VERSION}/bicep-linux-${targetarch}" \
+        -o "${PATH_LOCAL_BINS}/bicep" \
+    && chmod +x "${PATH_LOCAL_BINS}/bicep" \
     && bicep --version
+
+ARG FROM_VERSION
+FROM buildpack-deps:${FROM_VERSION} as azcopy
+ARG TARGETARCH
+ARG PATH_LOCAL_BINS
+RUN [ "${TARGETARCH:-}" != "" ] || (echo "missing build-arg TARGETARCH" && exit 1) \
+    && if [ "${TARGETARCH}" = "arm64" ]; then export azcopy_arch=${TARGETARCH}; fi \
+    && curl -sSL "https://aka.ms/downloadazcopy-v10-linux${azcopy_arch:+-$azcopy_arch}" -o /tmp/azcopy.tar.gz \
+    && tar -xzf /tmp/azcopy.tar.gz --strip-components=1 -C /tmp \
+    && chmod +x /tmp/azcopy \
+    && mv /tmp/azcopy "${PATH_LOCAL_BINS}/azcopy" \
+    && azcopy --version
+
+ARG FROM_VERSION
+FROM buildpack-deps:${FROM_VERSION} as git-lfs
+ARG TARGETARCH
+ARG PATH_LOCAL_BINS
+SHELL [ "/bin/bash", "--login", "-e", "-o", "pipefail", "-c" ]
+ARG GIT_LFS_VERSION
+ARG GIT_LFS_SHA256_amd64
+ARG GIT_LFS_SHA256_arm64
+RUN curl -sSL "https://github.com/git-lfs/git-lfs/releases/download/v${GIT_LFS_VERSION}/git-lfs-linux-${TARGETARCH}-v${GIT_LFS_VERSION}.tar.gz" \
+    -o /tmp/git-lfs.tar.gz \
+    && git_lfs_sha="${git_lfs_sha=GIT_LFS_SHA256_${TARGETARCH}}" \
+    && echo "${!git_lfs_sha} /tmp/git-lfs.tar.gz" | sha256sum -c - \
+    && tar -xzf /tmp/git-lfs.tar.gz --strip-components=1 -C /tmp \
+    && chmod +x /tmp/git-lfs \
+    && mv /tmp/git-lfs "${PATH_LOCAL_BINS}/git-lfs" \
+    && git-lfs --version
+
+ARG FROM_VERSION
+FROM buildpack-deps:${FROM_VERSION} as k8s-tools
+ARG TARGETARCH
+ARG PATH_LOCAL_BINS
+SHELL [ "/bin/bash", "--login", "-e", "-o", "pipefail", "-c" ]
+RUN KUBECTL_VERSION=$(curl -fsSL "https://dl.k8s.io/release/stable.txt") \
+    && curl -sSL "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/${TARGETARCH}/kubectl" \
+        -o "${PATH_LOCAL_BINS}/kubectl" \
+    && chmod +x "${PATH_LOCAL_BINS}/kubectl" \
+    && kubectl version --client \
+    && curl -sSL https://raw.githubusercontent.com/helm/helm/master/scripts/get-helm-3 | bash \
+    && helm version --client \
+    && curl -sSL -O "https://storage.googleapis.com/minikube/releases/latest/minikube-linux-${TARGETARCH}" \
+    && install "minikube-linux-${TARGETARCH}" "${PATH_LOCAL_BINS}/minikube" \
+    && rm "minikube-linux-${TARGETARCH}" \
+    && minikube version
+
+FROM base as rust
+ARG TARGETARCH
+SHELL [ "/bin/bash", "--login", "-e", "-o", "pipefail", "-c" ]
+ARG RUSTUP_HOME
+ARG CARGO_HOME
+ARG RUSTUP_DEFAULT_TOOLCHAIN=stable
+ENV PATH=${CARGO_HOME}/bin:${PATH}
+RUN curl -fsSL https://sh.rustup.rs \
+    | sh -s -- \
+        -y \
+        --default-toolchain=${RUSTUP_DEFAULT_TOOLCHAIN} \
+    && cargo --version \
+    && rustc --version
 
 FROM base as dotnet-powershell
 SHELL [ "/bin/bash", "--login", "-e", "-o", "pipefail", "-c" ]
 # Install PowerShell global tool
 ARG TARGETARCH
+ARG PATH_LOCAL_BINS
 ARG POWERSHELL_VERSION=7.2.13
 ARG TOOL_PATH_PWSH=/usr/share/powershell
 RUN dotnet tool install \
@@ -174,16 +239,17 @@ RUN dotnet tool install \
     --version "${POWERSHELL_VERSION}" \
     PowerShell \
     && find "${TOOL_PATH_PWSH}" -print | grep -i '.*[.]nupkg$' | xargs rm \
-    && ln -s "$(realpath --relative-to=/usr/local/bin "${TOOL_PATH_PWSH}")/pwsh" /usr/local/bin/pwsh \
+    && ln -s "$(realpath --relative-to="${PATH_LOCAL_BINS}" "${TOOL_PATH_PWSH}")/pwsh" "${PATH_LOCAL_BINS}/pwsh" \
     && chmod 755 "${TOOL_PATH_PWSH}/pwsh" \
     && [[ "$(pwsh --version)" =~ ${POWERSHELL_VERSION} ]]
 
 FROM base as dotnet-powershell-modules
 ARG TARGETARCH
+ARG PATH_LOCAL_BINS
 SHELL [ "/bin/bash", "--login", "-e", "-o", "pipefail", "-c" ]
 ARG TOOL_PATH_PWSH=/usr/share/powershell
-COPY --link --from=dotnet-powershell ${TOOL_PATH_PWSH} ${TOOL_PATH_PWSH}
-RUN ln -s "$(realpath --relative-to=/usr/local/bin "${TOOL_PATH_PWSH}")/pwsh" /usr/local/bin/pwsh
+COPY --link --from=dotnet-powershell "${TOOL_PATH_PWSH}" "${TOOL_PATH_PWSH}"
+RUN ln -s "$(realpath --relative-to="${PATH_LOCAL_BINS}" "${TOOL_PATH_PWSH}")/pwsh" "${PATH_LOCAL_BINS}/pwsh"
 ARG POWERSHELL_MODULES
 RUN pwsh -NonInteractive -Command "Set-PSRepository -Name PSGallery -InstallationPolicy Trusted" \
     && while IFS='' read -r pwshModule; do echo "installing ${pwshModule}" \
@@ -192,40 +258,42 @@ RUN pwsh -NonInteractive -Command "Set-PSRepository -Name PSGallery -Installatio
 
 FROM base as dotnet-powershell-az-modules
 ARG TARGETARCH
+ARG PATH_LOCAL_BINS
 SHELL [ "/bin/bash", "--login", "-e", "-o", "pipefail", "-c" ]
 ARG TOOL_PATH_PWSH=/usr/share/powershell
-COPY --link --from=dotnet-powershell ${TOOL_PATH_PWSH} ${TOOL_PATH_PWSH}
-RUN ln -s "$(realpath --relative-to=/usr/local/bin "${TOOL_PATH_PWSH}")/pwsh" /usr/local/bin/pwsh
+COPY --link --from=dotnet-powershell "${TOOL_PATH_PWSH}" "${TOOL_PATH_PWSH}"
+RUN ln -s "$(realpath --relative-to="${PATH_LOCAL_BINS}" "${TOOL_PATH_PWSH}")/pwsh" "${PATH_LOCAL_BINS}/pwsh"
 ARG POWERSHELL_AZ_MODULE_VERSIONS
 RUN pwsh -NonInteractive -Command "Set-PSRepository -Name PSGallery -InstallationPolicy Trusted" \
     && while IFS='' read -r azVersion; do echo "installing Az ${azVersion}" \
         && pwsh -NonInteractive -Command "Install-Module -Name Az -RequiredVersion ${azVersion} -Scope AllUsers -Repository PSGallery"; done \
         < <(printf "%s\n" "${POWERSHELL_AZ_MODULE_VERSIONS}" | jq -r '.[]')
 
+###########
+# runtime #
+###########
+
 FROM base as act
 
 # automatic buildx ARGs
 ARG TARGETARCH
+
+# path to local bins
+ARG PATH_LOCAL_BINS
 
 # enable pipefail and set workdir
 SHELL [ "/bin/bash", "--login", "-e", "-o", "pipefail", "-c" ]
 WORKDIR /tmp
 
 # Install current version of git
+ARG GIT_REPO=ppa:git-core/ppa
 # hadolint ignore=SC2035
-RUN add-apt-repository -y ppa:git-core/ppa \
+RUN add-apt-repository -y "${GIT_REPO}" \
     && apt-get -y update &>/dev/null \
     && apt-get -y install --no-install-recommends \
         git \
     && printf "[safe]\n\tdirectory = *\n" | tee -a /etc/gitconfig \
-    && apt-get clean \
-    && rm -rf /etc/apt/sources.list.d/* \
-    && rm -rf /var/lib/apt/lists/*
-
-# Install Git-LFS
-RUN curl -sSL https://packagecloud.io/install/repositories/github/git-lfs/script.deb.sh | bash \
-    && apt-get -y install --no-install-recommends \
-        git-lfs \
+    && add-apt-repository --remove "${GIT_REPO}" \
     && apt-get clean \
     && rm -rf /etc/apt/sources.list.d/* \
     && rm -rf /var/lib/apt/lists/*
@@ -280,20 +348,23 @@ RUN [[ $(curl -sL https://packages.microsoft.com/repos/azure-cli/dists/) =~ $(ls
     || echo "Azure CLI not available for this distribution"
 
 # Install default NodeJS
-ARG NODE_VERSION=20
-RUN curl -fsSL https://raw.githubusercontent.com/tj/n/master/bin/n -o ~/n \
+ARG NODE_VERSION
+RUN [ "${NODE_VERSION}" != "" ] || (echo "missing build-arg NODE_VERSION" && exit 1) \
+    && curl -fsSL https://raw.githubusercontent.com/tj/n/master/bin/n \
+        -o ~/n \
     && bash ~/n "${NODE_VERSION}" \
     && rm -rf ~/n \
     && chmod -R 777 /usr/local/lib/node_modules \
-    && chmod -R 777 /usr/local/bin \
-    && npm --version
+    && chmod -R 777 "${PATH_LOCAL_BINS}" \
+    && npm --version \
+    && node --version
 
 # Install YARN
 RUN curl -sS https://dl.yarnpkg.com/debian/pubkey.gpg \
     | apt-key add - \
     && echo "deb https://dl.yarnpkg.com/debian/ stable main" \
     | tee /etc/apt/sources.list.d/yarn.list \
-    && apt-get -y update \
+    && apt-get -y update &>/dev/null \
     && apt-get -y install --no-install-recommends \
         yarn \
     && apt-get clean \
@@ -320,11 +391,32 @@ RUN apt-get -y update &>/dev/null \
     && rm -rf /etc/apt/sources.list.d/* \
     && rm -rf /var/lib/apt/lists/*
 
+# add go
+COPY --link --from=golang /usr/local/go /usr/local/go
+ENV PATH=/usr/local/go/bin:${PATH}
+RUN sed "s|^PATH=|PATH=/usr/local/go/bin:|mg" -i /etc/environment
+
+# add pulumi
+COPY --link --from=pulumi /root/.pulumi/bin "${PATH_LOCAL_BINS}/"
+
+# add bicep
+COPY --link --from=bicep "${PATH_LOCAL_BINS}/bicep" "${PATH_LOCAL_BINS}/bicep"
+
+# add azcopy
+COPY --link --from=azcopy "${PATH_LOCAL_BINS}/azcopy" "${PATH_LOCAL_BINS}/azcopy"
+RUN ln -s azcopy "${PATH_LOCAL_BINS}/azcopy10"
+
+# add git-lfs
+COPY --link --from=git-lfs "${PATH_LOCAL_BINS}/git-lfs" "${PATH_LOCAL_BINS}/git-lfs"
+
+# add k8s-tools
+COPY --link --from=k8s-tools "${PATH_LOCAL_BINS}/helm" "${PATH_LOCAL_BINS}/kubectl" "${PATH_LOCAL_BINS}/minikube" "${PATH_LOCAL_BINS}"/
+
 # add rust
-ARG CARGO_HOME=/etc/skel/.cargo
-COPY --link --from=rust ${CARGO_HOME} ${CARGO_HOME}
-ARG RUSTUP_HOME=/etc/skel/.rustup
-COPY --link --from=rust ${RUSTUP_HOME} ${RUSTUP_HOME}
+ARG CARGO_HOME
+COPY --link --from=rust "${CARGO_HOME}" "${CARGO_HOME}"
+ARG RUSTUP_HOME
+COPY --link --from=rust "${RUSTUP_HOME}" "${RUSTUP_HOME}"
 ENV PATH=${CARGO_HOME}/bin:${PATH} \
     CARGO_HOME=${CARGO_HOME} \
     RUSTUP_HOME=${RUSTUP_HOME}
@@ -332,40 +424,17 @@ RUN sed "s|^PATH=|PATH=${CARGO_HOME}/bin:|mg" -i /etc/environment \
     && echo "CARGO_HOME=${CARGO_HOME}" | tee -a /etc/environment \
     && echo "RUSTUP_HOME=${RUSTUP_HOME}" | tee -a /etc/environment
 
-# add go
-COPY --link --from=golang /usr/local/go /usr/local/go
-ENV PATH=/usr/local/go/bin:${PATH}
-RUN sed "s|^PATH=|PATH=/usr/local/go/bin:|mg" -i /etc/environment
-
-# add pulumi
-COPY --link --from=pulumi /root/.pulumi/bin /usr/local/bin/
-
-# add bicep
-COPY --link --from=bicep /usr/local/bin/bicep /usr/local/bin/bicep
-
 # add PowerShell
 ARG TOOL_PATH_PWSH=/usr/share/powershell
-COPY --link --from=dotnet-powershell ${TOOL_PATH_PWSH} ${TOOL_PATH_PWSH}
-RUN ln -s "$(realpath --relative-to=/usr/local/bin "${TOOL_PATH_PWSH}")/pwsh" /usr/local/bin/pwsh
+COPY --link --from=dotnet-powershell "${TOOL_PATH_PWSH}" "${TOOL_PATH_PWSH}"
+RUN ln -s "$(realpath --relative-to="${PATH_LOCAL_BINS}" "${TOOL_PATH_PWSH}")/pwsh" "${PATH_LOCAL_BINS}/pwsh"
 
 # add  PowerShell-modules
 COPY --link --from=dotnet-powershell-modules /usr/local/share/powershell /usr/local/share/powershell
 COPY --link --from=dotnet-powershell-az-modules /usr/local/share/powershell /usr/local/share/powershell
 
-# upgrade and cleanup step
-RUN apt-get -y update \
-    && apt-get -y upgrade \
-    && apt-get -y clean \
-    && rm -rf \
-        /var/cache/* \
-        /var/log/* \
-        /var/lib/apt/lists/* \
-        /etc/apt/sources.list.d/* \
-        /tmp/* \
-    || echo 'Failed to delete directories'
-
 ARG RUNNER
-USER ${RUNNER}
+USER ${RUNNER:-root}
 
 # No idea how to do a healthcheck for this image
 HEALTHCHECK NONE

@@ -7,7 +7,6 @@ on:
   push:
     paths:
       - '**/Dockerfile'
-      - '**/.github/workflows/ci.yml'
       - '**/docker-bake.hcl'
   pull_request:
     branches: [main]
