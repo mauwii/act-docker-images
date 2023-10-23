@@ -213,7 +213,7 @@ FROM base as terraform
 ARG TARGETARCH
 ARG PATH_LOCAL_BINS
 SHELL [ "/bin/bash", "--login", "-e", "-o", "pipefail", "-c" ]
-RUN URL=$(curl -fsSL https://api.releases.hashicorp.com/v1/releases/terraform/latest \
+RUN URL=$(bash -o pipefail -c "curl -fsSL https://api.releases.hashicorp.com/v1/releases/terraform/latest" \
     | jq --arg arch "$(dpkg --print-architecture)" -r '.builds[] | select((.arch==$arch) and (.os=="linux")).url') \
     && curl -sSL "${URL}" \
         -o /tmp/terraform.zip \
