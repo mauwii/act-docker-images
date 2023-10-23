@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1
-# kics-scan disable=e36d8880-3f78-4546-b9a1-12f0745ca0d5,965a08d7-ef86-4f14-8792-4a3b2098937e,77783205-c4ca-4f80-bb80-c777f267c547,0008c003-79aa-42d8-95b8-1c2fe37dbfe6
+# kics-scan disable=e36d8880-3f78-4546-b9a1-12f0745ca0d5,965a08d7-ef86-4f14-8792-4a3b2098937e,77783205-c4ca-4f80-bb80-c777f267c547,0008c003-79aa-42d8-95b8-1c2fe37dbfe6,efbf148a-67e9-42d2-ac47-02fa1c0d0b22
 
 ##############
 # base-image #
@@ -206,8 +206,21 @@ RUN KUBECTL_VERSION=$(curl -fsSL "https://dl.k8s.io/release/stable.txt") \
         -o "${PATH_LOCAL_BINS}/kubectl" \
     && chmod +x "${PATH_LOCAL_BINS}/kubectl" \
     && curl -sSL https://raw.githubusercontent.com/helm/helm/master/scripts/get-helm-3 | bash \
-    && curl -sSL -O "https://storage.googleapis.com/minikube/releases/latest/minikube-linux-${TARGETARCH}" \
+    && curl -sSLO "https://storage.googleapis.com/minikube/releases/latest/minikube-linux-${TARGETARCH}" \
     && install "minikube-linux-${TARGETARCH}" "${PATH_LOCAL_BINS}/minikube"
+
+FROM base as terraform
+ARG TARGETARCH
+ARG PATH_LOCAL_BINS
+SHELL [ "/bin/bash", "--login", "-e", "-o", "pipefail", "-c" ]
+RUN URL=$(curl -fsSL https://api.releases.hashicorp.com/v1/releases/terraform/latest \
+    | jq --arg arch "$(dpkg --print-architecture)" -r '.builds[] | select((.arch==$arch) and (.os=="linux")).url') \
+    && curl -sSL "${URL}" \
+        -o /tmp/terraform.zip \
+    && unzip \
+        -qq /tmp/terraform.zip \
+        -d "${PATH_LOCAL_BINS}" \
+    && terraform --version
 
 FROM base as rust
 ARG TARGETARCH
@@ -406,7 +419,14 @@ RUN ln -s azcopy "${PATH_LOCAL_BINS}/azcopy10"
 COPY --link --from=git-lfs "${PATH_LOCAL_BINS}/git-lfs" "${PATH_LOCAL_BINS}/git-lfs"
 
 # add k8s-tools
-COPY --link --from=k8s-tools "${PATH_LOCAL_BINS}/helm" "${PATH_LOCAL_BINS}/kubectl" "${PATH_LOCAL_BINS}/minikube" "${PATH_LOCAL_BINS}"/
+COPY --link --from=k8s-tools \
+    "${PATH_LOCAL_BINS}/helm" \
+    "${PATH_LOCAL_BINS}/kubectl" \
+    "${PATH_LOCAL_BINS}/minikube" \
+    "${PATH_LOCAL_BINS}"/
+
+# add terraform
+COPY --link --from=terraform "${PATH_LOCAL_BINS}/terraform" "${PATH_LOCAL_BINS}/terraform"
 
 # add rust
 ARG CARGO_HOME
