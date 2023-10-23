@@ -183,7 +183,7 @@ jobs:
           summary: false
       # upload the results as a SARIF file to gh security tab
       # kics-scan ignore-line
-      - uses: github/codeql-action/upload-sarif@63470275e73bbef3ffab4f0bfff5b52e0772baf5
+      - uses: github/codeql-action/upload-sarif@a291b7c6a336cf5b20cf593486ed61b265f7a55a
         name: Upload SARIF result
         id: upload-sarif
         if: steps.docker-scout-cves.outcome == 'success'
