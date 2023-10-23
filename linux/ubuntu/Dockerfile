@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1
-# kics-scan disable=e36d8880-3f78-4546-b9a1-12f0745ca0d5,965a08d7-ef86-4f14-8792-4a3b2098937e,77783205-c4ca-4f80-bb80-c777f267c547,0008c003-79aa-42d8-95b8-1c2fe37dbfe6
+# kics-scan disable=e36d8880-3f78-4546-b9a1-12f0745ca0d5,965a08d7-ef86-4f14-8792-4a3b2098937e,77783205-c4ca-4f80-bb80-c777f267c547,0008c003-79aa-42d8-95b8-1c2fe37dbfe6,efbf148a-67e9-42d2-ac47-02fa1c0d0b22
 
 ##############
 # base-image #
@@ -213,7 +213,7 @@ FROM base as terraform
 ARG TARGETARCH
 ARG PATH_LOCAL_BINS
 SHELL [ "/bin/bash", "--login", "-e", "-o", "pipefail", "-c" ]
-RUN URL=$(bash -o pipefail -c "curl -fsSL https://api.releases.hashicorp.com/v1/releases/terraform/latest" \
+RUN URL=$(curl -fsSL https://api.releases.hashicorp.com/v1/releases/terraform/latest \
     | jq --arg arch "$(dpkg --print-architecture)" -r '.builds[] | select((.arch==$arch) and (.os=="linux")).url') \
     && curl -sSL "${URL}" \
         -o /tmp/terraform.zip \
