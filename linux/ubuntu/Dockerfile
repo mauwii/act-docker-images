@@ -220,13 +220,13 @@ RUN export PYPY_VERSIONS_JSON=/tmp/pypy_versions.json \
     && versions=() \
     && while IFS='' read -r version; do versions+=("$version"); done < <(printf "%s\n" "${PYPY_VERSIONS}" | jq -r '.[]') \
     && for version in "${versions[@]}"; do latest_python_version=$(jq --arg version "$version" -r '.[] | select((.python_version | startswith($version)) and (.stable==true)) | .python_version' "${PYPY_VERSIONS_JSON}" | sort -V | tail -n1) \
-        && echo "loading PyPY ${latest_python_version} for arch ${arch}" \
+        && echo "loading PyPy ${latest_python_version} for arch ${arch}" \
         && curl -fsSL "$(jq \
             --arg latest_python_version "${latest_python_version}" \
             --arg arch "${arch}" \
             -r 'map(select((.python_version==$latest_python_version) and .stable==true) | .files[] | select((.arch==$arch) and (.platform=="linux")) | .download_url) | .[]' "${PYPY_VERSIONS_JSON}")" \
             -o "${PYPY_TMP_ARCHIVE}" \
-        && PYPY_TOOLCACHE_DIR="${AGENT_TOOLSDIRECTORY}/PyPY" \
+        && PYPY_TOOLCACHE_DIR="${AGENT_TOOLSDIRECTORY}/PyPy" \
         && PYPY_TOOLCACHE_VERSION_DIR="${PYPY_TOOLCACHE_DIR}/${latest_python_version}" \
         && PYPY_TOOLCACHE_VERSION_ARCH_DIR="${PYPY_TOOLCACHE_VERSION_DIR}/${arch}" \
         && mkdir -p "$PYPY_TOOLCACHE_VERSION_ARCH_DIR" \
@@ -466,7 +466,7 @@ COPY --link --from=k8s-tools \
     "${PATH_LOCAL_BINS}"/
 
 # add PyPy
-COPY --link --from=pypy "${AGENT_TOOLSDIRECTORY}/PyPY" "${AGENT_TOOLSDIRECTORY}/PyPY"
+COPY --link --from=pypy "${AGENT_TOOLSDIRECTORY}/PyPy" "${AGENT_TOOLSDIRECTORY}/PyPy"
 
 # add terraform
 COPY --link --from=terraform "${PATH_LOCAL_BINS}/terraform" "${PATH_LOCAL_BINS}/terraform"
