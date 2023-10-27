@@ -227,12 +227,12 @@ ARG TARGETARCH
 SHELL [ "/bin/bash", "--login", "-e", "-o", "pipefail", "-c" ]
 ARG RUSTUP_HOME
 ARG CARGO_HOME
-ARG RUSTUP_DEFAULT_TOOLCHAIN=stable
 ENV PATH=${CARGO_HOME}/bin:${PATH}
 RUN curl -fsSL https://sh.rustup.rs \
     | sh -s -- \
         -y \
-        --default-toolchain=${RUSTUP_DEFAULT_TOOLCHAIN} \
+        --default-toolchain=stable \
+        --profile minimal \
     && cargo --version \
     && rustc --version
 
