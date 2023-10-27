@@ -209,6 +209,35 @@ RUN KUBECTL_VERSION=$(curl -fsSL "https://dl.k8s.io/release/stable.txt") \
     && curl -sSLO "https://storage.googleapis.com/minikube/releases/latest/minikube-linux-${TARGETARCH}" \
     && install "minikube-linux-${TARGETARCH}" "${PATH_LOCAL_BINS}/minikube"
 
+FROM base as pypy
+SHELL [ "/bin/bash", "--login", "-e", "-o", "pipefail", "-c" ]
+ARG PYPY_VERSIONS
+RUN export PYPY_VERSIONS_JSON=/tmp/pypy_versions.json \
+    && curl -fsSL https://downloads.python.org/pypy/versions.json -o "${PYPY_VERSIONS_JSON}" \
+    && arch="$(uname -m)" && if [[ "${arch}" = "x86_64" ]]; then arch="x64"; fi \
+    && export arch \
+    && export PYPY_TMP_ARCHIVE=/tmp/pypy.tar.bz2 \
+    && versions=() \
+    && while IFS='' read -r version; do versions+=("$version"); done < <(printf "%s\n" "${PYPY_VERSIONS}" | jq -r '.[]') \
+    && for version in "${versions[@]}"; do latest_python_version=$(jq --arg version "$version" -r '.[] | select((.python_version | startswith($version)) and (.stable==true)) | .python_version' "${PYPY_VERSIONS_JSON}" | sort -V | tail -n1) \
+        && echo "loading PyPY ${latest_python_version} for arch ${arch}" \
+        && curl -fsSL "$(jq \
+            --arg latest_python_version "${latest_python_version}" \
+            --arg arch "${arch}" \
+            -r 'map(select((.python_version==$latest_python_version) and .stable==true) | .files[] | select((.arch==$arch) and (.platform=="linux")) | .download_url) | .[]' "${PYPY_VERSIONS_JSON}")" \
+            -o "${PYPY_TMP_ARCHIVE}" \
+        && PYPY_TOOLCACHE_DIR="${AGENT_TOOLSDIRECTORY}/PyPY" \
+        && PYPY_TOOLCACHE_VERSION_DIR="${PYPY_TOOLCACHE_DIR}/${latest_python_version}" \
+        && PYPY_TOOLCACHE_VERSION_ARCH_DIR="${PYPY_TOOLCACHE_VERSION_DIR}/${arch}" \
+        && mkdir -p "$PYPY_TOOLCACHE_VERSION_ARCH_DIR" \
+        && tar -xjf "${PYPY_TMP_ARCHIVE}" \
+            --strip-components=1 \
+            -C "$PYPY_TOOLCACHE_VERSION_ARCH_DIR" \
+        && printf "%s\n" "$("${PYPY_TOOLCACHE_VERSION_ARCH_DIR}/bin/python" -c "import sys;print('{}.{}.{}'.format(*sys.pypy_version_info[0:3]))")" >"${PYPY_TOOLCACHE_VERSION_ARCH_DIR}/PYPY_VERSION" \
+        && touch "${PYPY_TOOLCACHE_VERSION_ARCH_DIR}.complete" \
+        && rm "${PYPY_TMP_ARCHIVE}"; done \
+    && rm "${PYPY_VERSIONS_JSON}"
+
 FROM base as terraform
 ARG TARGETARCH
 ARG PATH_LOCAL_BINS
@@ -435,6 +464,9 @@ COPY --link --from=k8s-tools \
     "${PATH_LOCAL_BINS}/kubectl" \
     "${PATH_LOCAL_BINS}/minikube" \
     "${PATH_LOCAL_BINS}"/
+
+# add PyPy
+COPY --link --from=pypy "${AGENT_TOOLSDIRECTORY}/PyPY" "${AGENT_TOOLSDIRECTORY}/PyPY"
 
 # add terraform
 COPY --link --from=terraform "${PATH_LOCAL_BINS}/terraform" "${PATH_LOCAL_BINS}/terraform"

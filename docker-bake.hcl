@@ -82,6 +82,10 @@ variable "POWERSHELL_MODULES" {
   default = "[\"MarkdownPS\",\"Microsoft.Graph\",\"Pester\",\"PSScriptAnalyzer\"]"
 }
 
+variable "PYPY_VERSIONS" {
+  default = "[\"3.10\",\"3.9\",\"3.8\",\"3.7\"]"
+}
+
 group "default" {
   targets = [
     "ubuntu"
@@ -133,6 +137,7 @@ target "ubuntu" {
     POWERSHELL_MODULES            = POWERSHELL_MODULES
     POWERSHELL_VERSION            = release.POWERSHELL_VERSION
     PULUMI_VERSION                = PULUMI_VERSION
+    PYPY_VERSIONS                 = PYPY_VERSIONS
     RUSTUP_HOME                   = "/usr/local/rustup"
     TOOL_PATH_PWSH                = "/usr/share/powershell"
   }
