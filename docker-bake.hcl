@@ -71,7 +71,7 @@ variable "NODE_VERSION" {
 }
 
 variable "PULUMI_VERSION" {
-  default = "3.89.0"
+  default = "3.91.0"
 }
 
 variable "POWERSHELL_AZ_MODULE_VERSIONS" {
@@ -113,7 +113,7 @@ target "ubuntu" {
   }
   args = {
     BICEP_VERSION                 = BICEP_VERSION
-    CARGO_HOME                    = "/etc/.skel/.cargo"
+    CARGO_HOME                    = "/usr/local/cargo"
     CODENAME                      = release.codename
     DEPENDENCIES                  = DEPENDENCIES
     DOTNET_CHANNEL                = release.DOTNET_CHANNEL
@@ -133,7 +133,7 @@ target "ubuntu" {
     POWERSHELL_MODULES            = POWERSHELL_MODULES
     POWERSHELL_VERSION            = release.POWERSHELL_VERSION
     PULUMI_VERSION                = PULUMI_VERSION
-    RUSTUP_HOME                   = "/etc/.skel/.rustup"
+    RUSTUP_HOME                   = "/usr/local/rustup"
     TOOL_PATH_PWSH                = "/usr/share/powershell"
   }
   name = "ubuntu-act-${release.codename}"
