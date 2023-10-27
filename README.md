@@ -12,9 +12,6 @@
 [![Docker-Hub description workflow badge][Docker-Hub-description-badge]][Workflow-DockerHubDescription]
 [![Mergify badge][mergify-badge]][mergify] [![License badge][License-badge]][License]
 
-> [!WARNING]  
-> Heavily under construction, so please do not use this anywhere in production
-
 ## What
 
 The docker images in this repository are made to be used with [nektos/act][nektos-act-repo], which

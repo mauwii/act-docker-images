@@ -227,12 +227,12 @@ ARG TARGETARCH
 SHELL [ "/bin/bash", "--login", "-e", "-o", "pipefail", "-c" ]
 ARG RUSTUP_HOME
 ARG CARGO_HOME
-ARG RUSTUP_DEFAULT_TOOLCHAIN=stable
 ENV PATH=${CARGO_HOME}/bin:${PATH}
 RUN curl -fsSL https://sh.rustup.rs \
     | sh -s -- \
         -y \
-        --default-toolchain=${RUSTUP_DEFAULT_TOOLCHAIN} \
+        --default-toolchain=stable \
+        --profile minimal \
     && cargo --version \
     && rustc --version
 
@@ -367,6 +367,17 @@ RUN [ "${NODE_VERSION}" != "" ] || (echo "missing build-arg NODE_VERSION" && exi
     && chmod -R 777 "${PATH_LOCAL_BINS}" \
     && npm --version \
     && node --version
+
+# Install nvm
+# hadolint ignore=SC2016,SC1091
+RUN export NVM_DIR=/etc/skel/.nvm \
+    && mkdir -p "${NVM_DIR}" \
+    && VERSION=$(curl -fsSL https://api.github.com/repos/nvm-sh/nvm/releases/latest | jq -r '.tag_name') \
+    && curl -fsSL https://raw.githubusercontent.com/nvm-sh/nvm/$VERSION/install.sh | bash \
+    && echo 'NVM_DIR=$HOME/.nvm' | tee -a /etc/environment \
+    && echo '[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"  # This loads nvm' | tee -a /etc/skel/.bash_profile \
+    && [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh" \
+    && nvm alias default system
 
 # Install YARN
 RUN curl -sS https://dl.yarnpkg.com/debian/pubkey.gpg \
