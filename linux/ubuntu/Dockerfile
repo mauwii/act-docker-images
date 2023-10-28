@@ -251,6 +251,17 @@ RUN URL=$(curl -fsSL https://api.releases.hashicorp.com/v1/releases/terraform/la
         -d "${PATH_LOCAL_BINS}" \
     && terraform --version
 
+FROM base as packer
+ARG TARGETARCH
+ARG PATH_LOCAL_BINS
+SHELL [ "/bin/bash", "--login", "-e", "-o", "pipefail", "-c" ]
+RUN URL=$(curl -fsSL https://api.releases.hashicorp.com/v1/releases/packer/latest | jq --arg arch "${TARGETARCH}" -r '.builds[] | select((.arch==$arch) and (.os=="linux")).url') \
+    && ZIP_NAME="packer_linux_amd64.zip" \
+    && curl -fsSL "${URL}" -o "/tmp/${ZIP_NAME}" \
+    && unzip -qq "/tmp/${ZIP_NAME}" -d "${PATH_LOCAL_BINS}" \
+    && packer --version \
+    && rm -f "/tmp/${ZIP_NAME}"
+
 FROM base as rust
 ARG TARGETARCH
 SHELL [ "/bin/bash", "--login", "-e", "-o", "pipefail", "-c" ]
@@ -470,6 +481,9 @@ COPY --link --from=pypy "${AGENT_TOOLSDIRECTORY}/PyPy" "${AGENT_TOOLSDIRECTORY}/
 
 # add terraform
 COPY --link --from=terraform "${PATH_LOCAL_BINS}/terraform" "${PATH_LOCAL_BINS}/terraform"
+
+# add packer
+COPY --link --from=packer "${PATH_LOCAL_BINS}/packer" "${PATH_LOCAL_BINS}/packer"
 
 # add rust
 ARG CARGO_HOME
