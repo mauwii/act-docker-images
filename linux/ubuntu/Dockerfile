@@ -209,6 +209,19 @@ RUN KUBECTL_VERSION=$(curl -fsSL "https://dl.k8s.io/release/stable.txt") \
     && curl -sSLO "https://storage.googleapis.com/minikube/releases/latest/minikube-linux-${TARGETARCH}" \
     && install "minikube-linux-${TARGETARCH}" "${PATH_LOCAL_BINS}/minikube"
 
+ARG FROM_VERSION
+FROM buildpack-deps:${FROM_VERSION} as miniconda
+ARG TARGETARCH
+ARG PATH_LOCAL_BINS
+ARG CONDA_PATH
+SHELL [ "/bin/bash", "--login", "-e", "-o", "pipefail", "-c" ]
+RUN targetarch="$(dpkg-architecture --query DEB_TARGET_GNU_CPU)" && if [[ "${targetarch}" == "amd64" ]]; then targetarch=x86_64; fi \
+    && curl -fsSL "https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-${targetarch}.sh" \
+        -o miniconda.sh \
+    && chmod +x miniconda.sh \
+    && ./miniconda.sh -b -p ${CONDA_PATH} \
+    && rm miniconda.sh
+
 FROM base as pypy
 SHELL [ "/bin/bash", "--login", "-e", "-o", "pipefail", "-c" ]
 ARG PYPY_VERSIONS
@@ -475,6 +488,13 @@ COPY --link --from=k8s-tools \
     "${PATH_LOCAL_BINS}/kubectl" \
     "${PATH_LOCAL_BINS}/minikube" \
     "${PATH_LOCAL_BINS}"/
+
+# add miniconda
+ARG CONDA_PATH
+ENV CONDA=${CONDA_PATH}
+COPY --link --from=miniconda "${CONDA_PATH}" "${CONDA_PATH}"
+RUN printf "CONDA=%s" "${CONDA_PATH}" | tee -a /etc/environment \
+    && ln -s "$(realpath --relative-to="${PATH_LOCAL_BINS}" "${CONDA_PATH}/bin")/conda" "${PATH_LOCAL_BINS}/conda"
 
 # add PyPy
 COPY --link --from=pypy "${AGENT_TOOLSDIRECTORY}/PyPy" "${AGENT_TOOLSDIRECTORY}/PyPy"
