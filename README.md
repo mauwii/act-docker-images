@@ -14,23 +14,23 @@
 
 ## What
 
-The docker images in this repository are made to be used with [nektos/act][nektos-act-repo], which
-is a very handy tool to execute github workflows locally.
+The containers in this repository are made to be used with [nektos/act][nektos-act-repo], which is a
+very handy tool to execute, test and debug github workflows locally.
 
 If you don't know it yet, I highly recommend to check it out 🤓
 
 ## Why
 
-In the other Images I had problems with executing azure related tools, so I decided to create my own
-image which is heavily inspired by the images of [catthehacker][catthehacker-image-repo] and the
+Since I had trouble with other images when executing azure related tools, I decided to create my own
+container which is heavily inspired by the images of [catthehacker][catthehacker-image-repo] and the
 [official runner images][actions-runner-images].
 
 ## How to use
 
-These Docker images are intended for use with nektos/arc, which allows you to run GitHub workflows
-on your local host.
+These Docker images are intended to be used with [nektos/act][nektos-act-repo]. Setup guides can be
+found [here][nektosSetupGuide].
 
-The easiest way is to add those lines in your `~/.actrc`:
+Add these lines in `~/.actrc` to use this image with act:
 
 ```bash
 -P ubuntu-latest=mauwii/ubuntu-act:latest
@@ -41,7 +41,7 @@ The easiest way is to add those lines in your `~/.actrc`:
 For further information about [nektos/act][nektos-act-repo] and how to use it, take a 👀 at the
 [nektos documentation📖][nektosDocs]
 
-## How I run act on my M2-Max 💻
+## How to run act on apple silicon 💻
 
 - Install act via [brew🍺](https://brew.sh)
 
@@ -99,7 +99,9 @@ For further information about [nektos/act][nektos-act-repo] and how to use it, t
 - `~/.actrc`:
 
   ```bash
-  --rm
+  --container-architecture linux/arm64
+  --rm=true
+  --reuse=false
   -P ubuntu-latest=mauwii/ubuntu-act:latest
   -P ubuntu-22.04=mauwii/ubuntu-act:22.04
   -P ubuntu-20.04=mauwii/ubuntu-act:20.04
@@ -154,7 +156,6 @@ To execute the mega-linter locally without the needs to install it, there are di
   ```bash
   npx mega-linter-runner \
       --flavor terraform \
-      -e GITHUB_TOKEN="$(gh auth token)" \
       --remove-container
   ```
 
@@ -176,6 +177,7 @@ repository root if you want to enable the pre-commit hooks on your system as wel
 [GitHub-Commits]: https://github.com/mauwii/act-docker-images/commits/ "GitHub repository - commits"
 [License]: https://github.com/mauwii/act-docker-images/blob/main/LICENSE "License"
 [nektos-act-repo]: https://github.com/nektos/act "nektos/act git repository"
+[nektosSetupGuide]: https://nektosact.com/installation/index.html "nektos/act setup guide"
 [nektosDocs]: https://nektosact.com/beginner/index.html "nektos/act docs"
 [catthehacker-image-repo]:
   https://github.com/catthehacker/docker_images
@@ -206,12 +208,9 @@ repository root if you want to enable the pre-commit hooks on your system as wel
 [DockerHub-size-badge]:
   https://badgen.net/docker/size/mauwii/ubuntu-act?icon=docker&label=image%20size
 [DockerHub-stars-badge]: https://badgen.net/docker/stars/mauwii/ubuntu-act?icon=docker&label=stars
-[GitHub-stars-badge]:
-  https://badgen.net/github/stars/mauwii/act-docker-images?icon=github
-[GitHub-forks-badge]:
-  https://badgen.net/github/forks/mauwii/act-docker-images?icon=github
-[GitHub-issues-badge]:
-  https://badgen.net/github/issues/mauwii/act-docker-images/?icon=github
+[GitHub-stars-badge]: https://badgen.net/github/stars/mauwii/act-docker-images?icon=github
+[GitHub-forks-badge]: https://badgen.net/github/forks/mauwii/act-docker-images?icon=github
+[GitHub-issues-badge]: https://badgen.net/github/issues/mauwii/act-docker-images/?icon=github
 [GitHub-commit-badge]:
   https://badgen.net/github/last-commit/mauwii/act-docker-images/main?icon=github&color=blue
 [License-badge]: https://badgen.net/github/license/mauwii/act-docker-images

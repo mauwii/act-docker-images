@@ -119,6 +119,7 @@ target "ubuntu" {
     BICEP_VERSION                 = BICEP_VERSION
     CARGO_HOME                    = "/usr/local/cargo"
     CODENAME                      = release.codename
+    CONDA_PATH                    = "/usr/share/miniconda"
     DEPENDENCIES                  = DEPENDENCIES
     DOTNET_CHANNEL                = release.DOTNET_CHANNEL
     DOTNET_DEPS                   = release.DOTNET_DEPS
