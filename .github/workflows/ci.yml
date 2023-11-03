@@ -176,7 +176,7 @@ jobs:
           sarif-file: sarif.output.json
           summary: false
       - name: Upload SARIF result
-        uses: github/codeql-action/upload-sarif@c73d8a69e18598d5de9d6bf5de3a374253cde261
+        uses: github/codeql-action/upload-sarif@137a1e070d9fce60979b4ba596a335a285a6266b
         id: upload-sarif
         if: steps.docker-scout-cves.outcome == 'success'
         with:
