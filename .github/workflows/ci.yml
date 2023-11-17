@@ -138,7 +138,7 @@ jobs:
 
       # Bake the image
       - name: Build and Push
-        uses: docker/bake-action@511fde2517761e303af548ec9e0ea74a8a100112
+        uses: docker/bake-action@849707117b03d39aba7924c50a10376a69e88d7d
         id: bake
         with:
           files: docker-bake.hcl
