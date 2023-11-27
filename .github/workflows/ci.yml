@@ -153,7 +153,7 @@ jobs:
 
       # Docker-Scout - Create SBOM
       - name: Create SBOM
-        uses: docker/scout-action@704685e6e6dc4462258fb11d36d3a14ca7bda1e6
+        uses: docker/scout-action@7c61653c2736d21969dd4593fde76c670d4a86cb
         id: docker-scout-sbom
         continue-on-error: true
         if: env.CONTAINER_PUSH == 'true' && vars.DOCKERHUB_USERNAME != ''
@@ -165,7 +165,7 @@ jobs:
 
       # vulnerability scan the image for main branch and upload the results as a SARIF file
       - name: Analyze for critical and high CVEs
-        uses: docker/scout-action@704685e6e6dc4462258fb11d36d3a14ca7bda1e6
+        uses: docker/scout-action@7c61653c2736d21969dd4593fde76c670d4a86cb
         id: docker-scout-cves
         continue-on-error: true
         if: env.CONTAINER_PUSH == 'true' && github.ref_name == 'main'
@@ -184,7 +184,7 @@ jobs:
 
       # vulnerability scanning to verify PRs
       - name: Docker Scout compare
-        uses: docker/scout-action@704685e6e6dc4462258fb11d36d3a14ca7bda1e6
+        uses: docker/scout-action@7c61653c2736d21969dd4593fde76c670d4a86cb
         id: pr-compare
         if: github.event_name == 'pull_request' && vars.DOCKERHUB_USERNAME != ''
         with:
