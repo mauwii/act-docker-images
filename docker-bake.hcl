@@ -55,15 +55,15 @@ variable "GIT_LFS_VERSION" {
 }
 
 variable "GOLANG_SHA256_amd64" {
-  default = "80d34f1fd74e382d86c2d6102e0e60d4318461a7c2f457ec1efc4042752d4248"
+  default = "9c5d48c54dd8b0a3b2ef91b0f92a1190aa01f11d26e98033efa64c46a30bba7b"
 }
 
 variable "GOLANG_SHA256_arm64" {
-  default = "fb3c7e15fc4413c5b81eb9f26dbd7cd4faedd5c720b30fa8e2ff77457f74cab6"
+  default = "8afe8e3fb6972eaa2179ef0a71678c67f26509fab4f0f67c4b00f4cdfa92dc87"
 }
 
 variable "GOLANG_VERSION" {
-  default = "1.20.10"
+  default = "1.20.12"
 }
 
 variable "NODE_VERSION" {
@@ -71,7 +71,7 @@ variable "NODE_VERSION" {
 }
 
 variable "PULUMI_VERSION" {
-  default = "3.91.0"
+  default = "3.96.2"
 }
 
 variable "POWERSHELL_AZ_MODULE_VERSIONS" {
