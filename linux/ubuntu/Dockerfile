@@ -176,9 +176,8 @@ RUN [ "${TARGETARCH:-}" != "" ] || (echo "missing build-arg TARGETARCH" && exit 
     && curl -sSL "https://aka.ms/downloadazcopy-v10-linux${azcopy_arch:+-$azcopy_arch}" -o /tmp/azcopy.tar.gz \
     && tar -xzf /tmp/azcopy.tar.gz --strip-components=1 -C /tmp \
     && chmod +x /tmp/azcopy \
-    && mv /tmp/azcopy "${PATH_LOCAL_BINS}/azcopy"
-    # \
-    # && azcopy --version
+    && mv /tmp/azcopy "${PATH_LOCAL_BINS}/azcopy" \
+    && azcopy --version
 
 ARG FROM_VERSION
 FROM buildpack-deps:${FROM_VERSION} as git-lfs
