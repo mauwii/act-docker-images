@@ -5,6 +5,9 @@ name: ci
 
 on:
   push:
+    branches:
+      - main
+      # - '!dependabot/**' # only run PR Jobs for dependabot branches
     paths:
       - '**/Dockerfile'
       - '**/docker-bake.hcl'
@@ -18,7 +21,7 @@ permissions:
 env:
   CONTAINER_REGISTRY: ${{ (vars.DOCKERHUB_USERNAME != '' && secrets.DOCKERHUB_TOKEN != '') && 'docker.io' || 'ghcr.io' }}
   CONTAINER_REGISTRY_USER: ${{ (vars.DOCKERHUB_USERNAME != '' && secrets.DOCKERHUB_TOKEN != '') && vars.DOCKERHUB_USERNAME || github.repository_owner }}
-  CONTAINER_PUSH: ${{ github.event_name != 'pull_request' && github.actor != 'nektos/act' }}
+  CONTAINER_PUSH: ${{ github.ref == 'refs/heads/main' && github.actor != 'nektos/act' }}
   GITHUB_SHA: ${{ github.event.pull_request.head.sha || github.event.after || github.sha }}
   BUILDKIT_PROGRESS: plain
 
@@ -131,7 +134,7 @@ jobs:
 
       # Used when the image is not pushed to a registry
       - name: Create directory for docker output
-        if: github.event_name == 'pull_request'
+        if: env.CONTAINER_PUSH
         run: 'mkdir -p "${DIRNAME}"'
         env:
           DIRNAME: ${{ format('{0}/{1}', github.workspace, matrix.platforms) }}
@@ -168,7 +171,7 @@ jobs:
         uses: docker/scout-action@7c61653c2736d21969dd4593fde76c670d4a86cb
         id: docker-scout-cves
         continue-on-error: true
-        if: env.CONTAINER_PUSH == 'true' && github.ref_name == 'main'
+        if: env.CONTAINER_PUSH == 'true'
         with:
           command: cves
           only-severities: critical,high
