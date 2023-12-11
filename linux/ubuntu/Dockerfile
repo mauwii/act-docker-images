@@ -97,24 +97,31 @@ ENV DOTNET_CLI_TELEMETRY_OPTOUT=1 \
     NUGET_PACKAGES=${AGENT_TOOLSDIRECTORY}/nugetpackages \
     PATH=${AGENT_TOOLSDIRECTORY}/dotnet/tools:${AGENT_TOOLSDIRECTORY}/dotnet:${PATH}
 
-# install .NET SDK
-RUN printf "Package: *net*\nPin: origin packages.microsoft.com\nPin-Priority: 1001\n" >/etc/apt/preferences.d/dotnet \
-    && deps=("libc6" "libgcc1" "libgssapi-krb5-2" "libstdc++6" "zlib1g") \
-    && while IFS='' read -r dep; do deps+=("$dep"); done < <(printf "%s\n" "${DOTNET_DEPS}" | jq -r '.[]') \
-    && apt-get -y update &>/dev/null \
-    && apt-get -y install --no-install-recommends \
-        "${deps[@]}" \
-    && curl -fsSL https://dot.net/v1/dotnet-install.sh \
-    | bash -s -- \
-        --install-dir "${DOTNET_ROOT}" \
-        --no-path \
-        --channel "${DOTNET_CHANNEL}" \
-        --version "${DOTNET_SDK_VERSION}" \
-    && rm -rf /etc/apt/preferences.d/dotnet \
-    && sed "s|^PATH=|PATH=${DOTNET_ROOT}:|mg" -i /etc/environment \
-    && apt-get clean \
-    && rm -rf /etc/apt/sources.list.d/* \
-    && rm -rf /var/lib/apt/lists/*
+# # install .NET SDK
+# RUN printf "Package: *net*\nPin: origin packages.microsoft.com\nPin-Priority: 1001\n" >/etc/apt/preferences.d/dotnet \
+#     && deps=("libc6" "libgcc1" "libgssapi-krb5-2" "libstdc++6" "zlib1g") \
+#     && while IFS='' read -r dep; do deps+=("$dep"); done < <(printf "%s\n" "${DOTNET_DEPS}" | jq -r '.[]') \
+#     && apt-get -y update &>/dev/null \
+#     && apt-get -y install --no-install-recommends \
+#         "${deps[@]}" \
+#     && curl -fsSL https://dot.net/v1/dotnet-install.sh \
+#     | bash -s -- \
+#         --install-dir "${DOTNET_ROOT}" \
+#         --no-path \
+#         --channel "${DOTNET_CHANNEL}" \
+#         --version "${DOTNET_SDK_VERSION}" \
+#     && rm -rf /etc/apt/preferences.d/dotnet \
+#     && sed "s|^PATH=|PATH=${DOTNET_ROOT}:|mg" -i /etc/environment \
+#     && apt-get clean \
+#     && rm -rf /etc/apt/sources.list.d/* \
+#     && rm -rf /var/lib/apt/lists/*
+RUN curl -LO https://dotnet.microsoft.com/download/dotnet/scripts/v1/dotnet-install.sh \
+&& cat ./dotnet-install.sh \
+&& bash ./dotnet-install.sh --install-dir /opt/hostedtoolcache/dotnet --no-path --channel STS  # net 7.0 \
+&& bash ./dotnet-install.sh --install-dir /opt/hostedtoolcache/dotnet --no-path --channel LTS  # net 6.0 \
+&& rm ./dotnet-install.sh \
+&& export DOTNET_ROOT=/opt/hostedtoolcache/dotnet \
+&& export PATH=$PATH:$DOTNET_ROOT
 
 # Install apt-fast
 RUN bash -c "$(curl -fsSL https://raw.githubusercontent.com/ilikenwf/apt-fast/master/quick-install.sh)" \
