@@ -103,7 +103,7 @@ target "ubuntu" {
         DOTNET_CHANNEL     = "7.0"
         DOTNET_DEPS        = "[\"libicu70\",\"libssl3\",\"libunwind8\",\"libgcc-s1\",\"liblttng-ust1\"]"
         DOTNET_SDK_VERSION = "latest"
-        POWERSHELL_VERSION = "7.2.18"
+        POWERSHELL_VERSION = "7.2.13"
       },
       {
         version            = "20.04"
@@ -111,7 +111,7 @@ target "ubuntu" {
         DOTNET_CHANNEL     = "7.0"
         DOTNET_DEPS        = "[\"libicu66\",\"libssl1.1\"]"
         DOTNET_SDK_VERSION = "latest"
-        POWERSHELL_VERSION = "7.2.18"
+        POWERSHELL_VERSION = "7.2.13"
       }
     ]
   }
