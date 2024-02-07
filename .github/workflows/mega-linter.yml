@@ -48,7 +48,7 @@ jobs:
       # You can override MegaLinter flavor used to have faster performances
       # More info at https://megalinter.io/latest/flavors
       # kics-scan ignore-line
-      - uses: oxsecurity/megalinter/flavors/terraform@5364b811bbe86576d832227be174ebc2aa0f5f49
+      - uses: oxsecurity/megalinter/flavors/terraform@688bc7466d7ab4faa83d614c2e6f9acf42b674dc
         name: MegaLinter
         id: ml
         env:
