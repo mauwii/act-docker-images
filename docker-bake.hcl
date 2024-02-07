@@ -100,7 +100,7 @@ target "ubuntu" {
       {
         version            = "22.04"
         codename           = "jammy"
-        DOTNET_CHANNEL     = "LTS"
+        DOTNET_CHANNEL     = "7.0"
         DOTNET_DEPS        = "[\"libicu70\",\"libssl3\",\"libunwind8\",\"libgcc-s1\",\"liblttng-ust1\"]"
         DOTNET_SDK_VERSION = "latest"
         POWERSHELL_VERSION = "7.2.18"
@@ -108,7 +108,7 @@ target "ubuntu" {
       {
         version            = "20.04"
         codename           = "focal"
-        DOTNET_CHANNEL     = "LTS"
+        DOTNET_CHANNEL     = "7.0"
         DOTNET_DEPS        = "[\"libicu66\",\"libssl1.1\"]"
         DOTNET_SDK_VERSION = "latest"
         POWERSHELL_VERSION = "7.2.18"
