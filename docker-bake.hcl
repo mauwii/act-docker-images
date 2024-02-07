@@ -55,15 +55,15 @@ variable "GIT_LFS_VERSION" {
 }
 
 variable "GOLANG_SHA256_amd64" {
-  default = "80d34f1fd74e382d86c2d6102e0e60d4318461a7c2f457ec1efc4042752d4248"
+  default = "ff445e48af27f93f66bd949ae060d97991c83e11289009d311f25426258f9c44"
 }
 
 variable "GOLANG_SHA256_arm64" {
-  default = "fb3c7e15fc4413c5b81eb9f26dbd7cd4faedd5c720b30fa8e2ff77457f74cab6"
+  default = "2096507509a98782850d1f0669786c09727053e9fe3c92b03c0d96f48700282b"
 }
 
 variable "GOLANG_VERSION" {
-  default = "1.20.10"
+  default = "1.20.14"
 }
 
 variable "NODE_VERSION" {
@@ -71,7 +71,7 @@ variable "NODE_VERSION" {
 }
 
 variable "PULUMI_VERSION" {
-  default = "3.91.0"
+  default = "3.104.2"
 }
 
 variable "POWERSHELL_AZ_MODULE_VERSIONS" {
@@ -100,7 +100,7 @@ target "ubuntu" {
       {
         version            = "22.04"
         codename           = "jammy"
-        DOTNET_CHANNEL     = "LTS"
+        DOTNET_CHANNEL     = "6.0"
         DOTNET_DEPS        = "[\"libicu70\",\"libssl3\",\"libunwind8\",\"libgcc-s1\",\"liblttng-ust1\"]"
         DOTNET_SDK_VERSION = "latest"
         POWERSHELL_VERSION = "7.2.13"
@@ -108,7 +108,7 @@ target "ubuntu" {
       {
         version            = "20.04"
         codename           = "focal"
-        DOTNET_CHANNEL     = "LTS"
+        DOTNET_CHANNEL     = "6.0"
         DOTNET_DEPS        = "[\"libicu66\",\"libssl1.1\"]"
         DOTNET_SDK_VERSION = "latest"
         POWERSHELL_VERSION = "7.2.13"
