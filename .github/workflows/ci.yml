@@ -198,7 +198,7 @@ jobs:
           ignore-unchanged: true
           only-fixed: true
           only-severities: critical, high
-          write-comment: ${{ github.actor != 'nektos/act' }}
+          write-comment: false
           summary: ${{ github.actor != 'nektos/act' }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
           organization: ${{ vars.DOCKERHUB_USERNAME}}
