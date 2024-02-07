@@ -9,7 +9,7 @@ contact_links:
     url: https://github.com/nektos/act
     about: The great tool which enables you to run GitHub workflows locally.
   - name: nektos/act documentation
-    url: https://nektosact.com/beginner/index.html
+    url: https://nektosact.com/introduction.html
     about: Docs for nektos/act to find out more about how to actually use this tool.
   - name: GitHub Community Support
     url: https://github.com/orgs/community/discussions
