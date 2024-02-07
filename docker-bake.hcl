@@ -55,15 +55,15 @@ variable "GIT_LFS_VERSION" {
 }
 
 variable "GOLANG_SHA256_amd64" {
-  default = "9c5d48c54dd8b0a3b2ef91b0f92a1190aa01f11d26e98033efa64c46a30bba7b"
+  default = "ff445e48af27f93f66bd949ae060d97991c83e11289009d311f25426258f9c44"
 }
 
 variable "GOLANG_SHA256_arm64" {
-  default = "8afe8e3fb6972eaa2179ef0a71678c67f26509fab4f0f67c4b00f4cdfa92dc87"
+  default = "2096507509a98782850d1f0669786c09727053e9fe3c92b03c0d96f48700282b"
 }
 
 variable "GOLANG_VERSION" {
-  default = "1.20.12"
+  default = "1.20.14"
 }
 
 variable "NODE_VERSION" {
