@@ -71,7 +71,7 @@ variable "NODE_VERSION" {
 }
 
 variable "PULUMI_VERSION" {
-  default = "3.96.2"
+  default = "3.104.2"
 }
 
 variable "POWERSHELL_AZ_MODULE_VERSIONS" {
