@@ -178,7 +178,7 @@ repository root if you want to enable the pre-commit hooks on your system as wel
 [License]: https://github.com/mauwii/act-docker-images/blob/main/LICENSE "License"
 [nektos-act-repo]: https://github.com/nektos/act "nektos/act git repository"
 [nektosSetupGuide]: https://nektosact.com/installation/index.html "nektos/act setup guide"
-[nektosDocs]: https://nektosact.com/beginner/index.html "nektos/act docs"
+[nektosDocs]: https://nektosact.com/introduction.html "nektos/act docs"
 [catthehacker-image-repo]:
   https://github.com/catthehacker/docker_images
   "catthehacker/docker_images repo"
