@@ -294,7 +294,7 @@ SHELL [ "/bin/bash", "--login", "-e", "-o", "pipefail", "-c" ]
 # Install PowerShell global tool
 ARG TARGETARCH
 ARG PATH_LOCAL_BINS
-ARG POWERSHELL_VERSION=7.2.13
+ARG POWERSHELL_VERSION
 ARG TOOL_PATH_PWSH=/usr/share/powershell
 RUN dotnet tool install \
     --tool-path "${TOOL_PATH_PWSH}" \
