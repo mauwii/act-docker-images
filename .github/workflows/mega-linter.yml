@@ -71,7 +71,7 @@ jobs:
             mega-linter.log
 
       # Create pull request if applicable (for now works only on PR from same repository, not from forks)
-      - uses: peter-evans/create-pull-request@a4f52f8033a6168103c2538976c07b467e8163bc
+      - uses: peter-evans/create-pull-request@70a41aba780001da0a30141984ae2a0c95d8704e
         name: Create Pull Request with applied fixes
         id: cpr
         if: >-
